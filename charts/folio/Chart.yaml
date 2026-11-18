@@ -1,0 +1,6 @@
+apiVersion: v2
+name: folio
+description: Code-declared settings and contextual evaluation
+type: application
+version: 0.0.0
+appVersion: "0.0.0"

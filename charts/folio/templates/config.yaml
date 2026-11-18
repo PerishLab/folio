@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+data:
+  folio.toml: |
+    issuer = {{ required "issuer is required" .Values.issuer | toJson }}
+    audience = {{ .Values.audience | toJson }}
+    keys = "/config/jwks.json"
+    data = "/data/state"
+    listen = "0.0.0.0:8080"
+  jwks.json: {{ required "trusted public jwks is required" .Values.jwks | toJson | quote }}
