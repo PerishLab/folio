@@ -1,0 +1,25 @@
+[workspace]
+resolver = "3"
+members = ["crates/lib", "crates/api"]
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/PerishLab/folio"
+[workspace.dependencies]
+folio = { path = "crates/lib", version = "=0.0.0", registry = "perish" }
+keel = { version = "0", registry = "perish" }
+keel-document = { version = "0", registry = "perish" }
+radicula-document = { version = "0", registry = "perish" }
+radicula-oidc = { version = "0", registry = "perish" }
+radicula-config = { version = "0", registry = "perish" }
+plumb = { version = "0", registry = "perish" }
+axum = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "net"] }
+tempfile = "3"
+tower = { version = "0.5", features = ["util"] }
+clap = { version = "4", features = ["derive"] }
+p256 = { version = "0.13", features = ["pem"] }
+base64 = "0.22"

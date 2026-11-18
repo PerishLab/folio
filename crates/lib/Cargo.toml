@@ -1,0 +1,18 @@
+[package]
+name = "folio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Code-declared settings evaluation and document-backed user preferences"
+publish = ["perish"]
+[dependencies]
+keel.workspace = true
+keel-document.workspace = true
+radicula-document.workspace = true
+radicula-oidc.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+[dev-dependencies]
+tempfile.workspace = true
+tokio.workspace = true

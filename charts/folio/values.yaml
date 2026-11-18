@@ -1,0 +1,11 @@
+issuer: ""
+audience: folio
+jwks: {}
+image:
+  repository: ghcr.io/perishlab/folio
+  tag: ""
+  pullPolicy: IfNotPresent
+storage:
+  size: 1Gi
+  className: ""
+  existingClaim: ""

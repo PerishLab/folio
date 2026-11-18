@@ -1,0 +1,41 @@
+[identity]
+ns = "folio"
+[release]
+authority = "https://releases.folio.perish.uk"
+binaries = ["folio-api"]
+targets = ["x86_64-unknown-linux-gnu"]
+skill = false
+[release.cargo]
+registry = "perish"
+packages = ["folio"]
+[release.oci]
+registry = "ghcr.io"
+image = "perishlab/folio"
+account = "PerishLab"
+binary = "folio-api"
+[release.chart]
+registry = "ghcr.io"
+chart = "perishlab/folio"
+account = "PerishLab"
+[layout]
+[[layout.seat]]
+path = "crates/*"
+anchor = ["Cargo.toml"]
+note = "Settings control library and API service."
+[[layout.seat]]
+path = ".cargo"
+note = "Public registry configuration."
+[[layout.file]]
+name = ["Cargo.toml", "Cargo.lock"]
+note = "Workspace and dependency resolution."
+[[layout.file]]
+name = ["Containerfile"]
+note = "API image built from its formal binary."
+
+[[layout.seat]]
+path = "charts/*"
+anchor = ["Chart.yaml"]
+note = "Formal Helm service declaration."
+[[layout.file]]
+name = ["README.md"]
+note = "Public API and deployment entry."
