@@ -1,9 +1,10 @@
-use crate::Error;
+use crate::{Error, schema};
 use keel::{Graph, atom::Kind, spec::Spec};
 use keel_document::{Collection, Field, Model, Shape};
 
 pub fn stock(graph: &mut Graph) {
     keel_document::stock(graph);
+    schema::stock(graph);
     graph.add(
         Spec::build("Actor")
             .field("issuer", Kind::Text)
@@ -20,7 +21,7 @@ pub(crate) fn graph() -> Graph {
 }
 
 pub(crate) fn model() -> Result<Model, Error> {
-    Ok(Model::new(vec![Collection::new(
+    let users = Collection::new(
         "users",
         Shape::Object(vec![
             Field::required("owner", Shape::Text),
@@ -30,7 +31,9 @@ pub(crate) fn model() -> Result<Model, Error> {
                 Shape::Map(Box::new(Shape::Map(Box::new(Shape::Any)))),
             ),
         ]),
-    )?])?)
+    )?;
+    let schemas = Collection::new(schema::COLLECTION, Shape::Any)?;
+    Ok(Model::new(vec![users, schemas])?)
 }
 
 pub(crate) async fn seed(core: &keel::Core<keel::adapt::db::Sqlite>) -> Result<(), Error> {

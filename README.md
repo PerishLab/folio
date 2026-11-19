@@ -32,9 +32,22 @@ folio-api serve /path/to/config
 ```
 
 Bootstrap initializes a vacant data directory or verifies a complete existing
-one. Serve requires that initialized directory. Preserve `estate.sqlite3` and
-`documents/` together. A single process holds the data root; SIGINT/SIGTERM drain
-requests before exit. `/health` performs an actual native resource read.
+one. A new root includes the `meta` and `theme` templates at edition 1.
+Keel holds the template and edition identities and their document references.
+The `schemas` collection holds their Draft 2020-12 schema envelopes.
+Bootstrap validates the meta-schema against itself and checks both registered
+bodies. Reopening verifies the same resource and document bindings before
+serving.
+
+Data roots created before template bootstrap use the preceding format. For the
+development cutover, set `data = "data-v1"` in `folio.toml` to select a new
+vacant directory, run `folio-api bootstrap /path/to/config`, then run
+`folio-api serve /path/to/config` and re-enter any needed test preferences.
+An existing root with a missing format marker refuses to start. Keep
+`format`, `estate.sqlite3`, and `documents/` together when retaining a root.
+The settings routes and response shape continue to use the code Catalog.
+A single process holds the data root. SIGINT/SIGTERM drain requests before
+exit. `/health` performs an actual native resource read.
 Configuration uses Radicula Cascade and Plumb resolution, under the `API_`
 prefix. Relative keys and data paths resolve against the supplied config root.
 

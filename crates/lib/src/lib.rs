@@ -4,8 +4,10 @@ mod auth;
 mod catalog;
 mod change;
 mod error;
+mod format;
 mod model;
 mod runtime;
+mod schema;
 mod view;
 
 pub use auth::{Auth, Identity};
