@@ -13,6 +13,7 @@ radicula-document.workspace = true
 radicula-oidc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+jsonschema.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 tokio.workspace = true

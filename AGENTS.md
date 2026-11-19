@@ -37,8 +37,11 @@ identity. Design renders controlled component properties and user intents.
   identity lookup uses the anonymous native face; document effects use the mapped
   operator face. The API exposes settings operations, not generic Keel resources.
 - Bootstrap initializes a vacant data root or verifies an already complete root.
-  Serve opens an existing root. Partial or conflicting roots retain their evidence
-  and refuse. Keep the SQLite estate and redb payload directory together.
+  Genesis registers the trusted meta-schema and theme template editions in Keel
+  with schema documents in the native store. The on-disk format marker records
+  successful bootstrap. Serve verifies the marker and the exact initial edition
+  bindings. Partial or conflicting roots retain their evidence and refuse.
+  Keep the format marker, SQLite estate and redb payload directory together.
 - One process owns one root. The server drains requests on SIGINT/SIGTERM before
   exit. HTTP health performs a native resource read. Public errors expose stable
   categories; driver details do not enter response bodies.

@@ -1,4 +1,4 @@
-use crate::{Catalog, Device, Error, Identity, State, Write, model};
+use crate::{Catalog, Device, Error, Identity, State, Write, format, model, schema};
 use keel::adapt::db::Sqlite;
 use keel::{Core, Op, bind, bootstrap, form};
 use keel_document::{Condition, Projection, Query, Record, Store};
@@ -38,6 +38,8 @@ impl Runtime {
         let core = Arc::new(boot.seal(&token).await?.identify("Actor")?);
         model::seed(&core).await?;
         let store = Store::create(core.clone(), model::model()?, &root.join("documents")).await?;
+        schema::seed(&core, &store).await?;
+        format::write(root)?;
         Ok(Self {
             core,
             store,
@@ -47,12 +49,14 @@ impl Runtime {
     }
 
     pub async fn open(root: &Directory, catalog: Catalog, issuer: String) -> Result<Self, Error> {
+        format::read(root)?;
         if !root.join("estate.sqlite3").is_file() {
             return Err(Error::Unavailable);
         }
         let wire = Sqlite::file(&root.join("estate.sqlite3")).await?;
         let core = Arc::new(bind(model::graph(), wire).await?.identify("Actor")?);
         let store = Store::open(core.clone(), model::model()?, &root.join("documents")).await?;
+        schema::verify(&core, &store).await?;
         Ok(Self {
             core,
             store,
