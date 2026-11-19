@@ -1,4 +1,4 @@
-use crate::{Catalog, Error, Identity, State, Write, model};
+use crate::{Catalog, Device, Error, Identity, State, Write, model};
 use keel::adapt::db::Sqlite;
 use keel::{Core, Op, bind, bootstrap, form};
 use keel_document::{Condition, Projection, Query, Record, Store};
@@ -138,10 +138,19 @@ impl Runtime {
     }
 
     pub async fn read(&self, identity: &Identity, app: Option<&str>) -> Result<State, Error> {
+        self.render(identity, app, Device::default()).await
+    }
+
+    pub async fn render(
+        &self,
+        identity: &Identity,
+        app: Option<&str>,
+        device: Device,
+    ) -> Result<State, Error> {
         self.catalog.app(app)?;
         let actor = self.operator(identity).await?;
         let record = self.record(actor).await?;
-        self.evaluate(identity, app, &record)
+        self.evaluate(identity, app, &record, device)
     }
 
     pub async fn write(
@@ -149,6 +158,16 @@ impl Runtime {
         identity: &Identity,
         app: Option<&str>,
         write: &Write,
+    ) -> Result<State, Error> {
+        self.submit(identity, app, write, Device::default()).await
+    }
+
+    pub async fn submit(
+        &self,
+        identity: &Identity,
+        app: Option<&str>,
+        write: &Write,
+        device: Device,
     ) -> Result<State, Error> {
         self.catalog.app(app)?;
         let actor = self.operator(identity).await?;
@@ -167,7 +186,7 @@ impl Runtime {
             head: record.head.clone(),
             value: body,
         };
-        let mut state = self.evaluate(identity, app, &candidate)?;
+        let mut state = self.evaluate(identity, app, &candidate, device)?;
         let operations = [Operation::Set {
             path: Path::root(),
             value: candidate.value.take(),

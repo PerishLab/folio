@@ -30,11 +30,62 @@ pub struct Item {
     pub editable: bool,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Tone {
+    Light,
+    Dark,
+}
+
+impl Tone {
+    pub fn parse(value: &str) -> Result<Self, Error> {
+        match value {
+            "light" => Ok(Self::Light),
+            "dark" => Ok(Self::Dark),
+            _ => Err(Error::Invalid("tone".into())),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Device {
+    tone: Option<Tone>,
+}
+
+impl Device {
+    pub fn new(tone: Option<&str>) -> Result<Self, Error> {
+        Ok(Self {
+            tone: tone.map(Tone::parse).transpose()?,
+        })
+    }
+
+    pub fn tone(self) -> Option<Tone> {
+        self.tone
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Basis {
+    Setting,
+    Device,
+    Default,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Presentation {
+    pub system: String,
+    pub tone: Tone,
+    pub basis: Basis,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct State {
     pub revision: String,
     pub app: Option<String>,
     pub items: Vec<Item>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub presentation: Option<Presentation>,
 }
 
 impl Runtime {
@@ -43,6 +94,7 @@ impl Runtime {
         identity: &Identity,
         app: Option<&str>,
         record: &Record,
+        device: Device,
     ) -> Result<State, Error> {
         let context = Context {
             identity,
@@ -81,10 +133,16 @@ impl Runtime {
                 editable: !decision.readonly && decision.force.is_none(),
             });
         }
+        let presentation = if self.catalog.presentation {
+            present(&items, device)?
+        } else {
+            None
+        };
         Ok(State {
             revision: record.head.token.clone(),
             app: context.app.map(str::to_string),
             items,
+            presentation,
         })
     }
 }
@@ -120,6 +178,42 @@ fn selected<'a>(
         .and_then(|options| options.first())
         .expect("validated policy choices");
     (value, Source::Policy)
+}
+
+fn present(items: &[Item], device: Device) -> Result<Option<Presentation>, Error> {
+    let family = items
+        .iter()
+        .find(|item| item.name == "theme.family")
+        .and_then(|item| item.effective.as_str());
+    let preference = items
+        .iter()
+        .find(|item| item.name == "theme.tone")
+        .and_then(|item| item.effective.as_str());
+    let (Some(family), Some(preference)) = (family, preference) else {
+        return Ok(None);
+    };
+    let system = system(family);
+    let (tone, basis) = match preference {
+        "light" => (Tone::Light, Basis::Setting),
+        "dark" => (Tone::Dark, Basis::Setting),
+        "system" => match device.tone() {
+            Some(tone) => (tone, Basis::Device),
+            None => (Tone::Light, Basis::Default),
+        },
+        _ => return Err(Error::Corrupt),
+    };
+    Ok(Some(Presentation {
+        system: system.into(),
+        tone,
+        basis,
+    }))
+}
+
+fn system(family: &str) -> &str {
+    match family {
+        "google" => "google-accounts",
+        family => family,
+    }
 }
 
 fn declared(value: Option<&Value>) -> Declared {
