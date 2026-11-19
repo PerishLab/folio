@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+mod document;
+
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
@@ -64,6 +66,7 @@ pub fn router(runtime: Runtime, auth: Auth) -> Router {
                 },
             ),
         )
+        .route("/v1/me/documents/preferences", document::route())
         .with_state(Arc::new(App { runtime, auth }))
 }
 

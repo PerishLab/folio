@@ -1,4 +1,4 @@
-use crate::{Catalog, Device, Error, Identity, State, Write, format, model, schema};
+use crate::{Catalog, Device, Error, Identity, Snapshot, State, Write, format, model, schema};
 use keel::adapt::db::Sqlite;
 use keel::{Core, Op, bind, bootstrap, form};
 use keel_document::{Condition, Projection, Query, Record, Store};
@@ -154,7 +154,24 @@ impl Runtime {
         self.catalog.app(app)?;
         let actor = self.operator(identity).await?;
         let record = self.record(actor).await?;
-        self.evaluate(identity, app, &record, device)
+        let view = self.evaluate(identity, app, record.value.root(), device)?;
+        Ok(view.state(record.head.token))
+    }
+
+    pub async fn snapshot(
+        &self,
+        identity: &Identity,
+        app: Option<&str>,
+        device: Device,
+    ) -> Result<Snapshot, Error> {
+        self.catalog.app(app)?;
+        let actor = self.operator(identity).await?;
+        let record = self.record(actor).await?;
+        let document = self.views(identity, app, record.value.root(), device)?;
+        Ok(Snapshot {
+            revision: record.head.token,
+            document,
+        })
     }
 
     pub async fn write(
@@ -174,6 +191,36 @@ impl Runtime {
         device: Device,
     ) -> Result<State, Error> {
         self.catalog.app(app)?;
+        let (view, revision) = self
+            .publish(identity, write, |body| {
+                self.evaluate(identity, app, body, device)
+            })
+            .await?;
+        Ok(view.state(revision))
+    }
+
+    pub async fn confirm(
+        &self,
+        identity: &Identity,
+        app: Option<&str>,
+        write: &Write,
+        device: Device,
+    ) -> Result<Snapshot, Error> {
+        self.catalog.app(app)?;
+        let (document, revision) = self
+            .publish(identity, write, |body| {
+                self.views(identity, app, body, device)
+            })
+            .await?;
+        Ok(Snapshot { revision, document })
+    }
+
+    async fn publish<T>(
+        &self,
+        identity: &Identity,
+        write: &Write,
+        view: impl FnOnce(&radicula_document::Value) -> Result<T, Error>,
+    ) -> Result<(T, String), Error> {
         let actor = self.operator(identity).await?;
         let record = self.record(actor).await?;
         if record.head.token != write.revision {
@@ -182,21 +229,16 @@ impl Runtime {
         if write.changes.is_empty() {
             return Err(Error::Invalid("empty change batch".into()));
         }
-        let mut body = record.value.clone();
+        let mut body = record.value;
         for change in &write.changes {
             change.apply(&self.catalog, identity, &mut body)?;
         }
-        let candidate = Record {
-            head: record.head.clone(),
-            value: body,
-        };
-        let mut state = self.evaluate(identity, app, &candidate, device)?;
+        let result = view(body.root())?;
         let operations = [Operation::Set {
             path: Path::root(),
-            value: candidate.value.take(),
+            value: body.take(),
         }];
         let record = self.store.of(actor).edit(&record.head, &operations).await?;
-        state.revision = record.head.token;
-        Ok(state)
+        Ok((result, record.head.token))
     }
 }

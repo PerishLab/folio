@@ -1,7 +1,6 @@
 use crate::{Context, Error, Identity, Runtime};
-use keel_document::Record;
 use radicula_document::Value;
-use serde::Serialize;
+use serde::{Serialize, Serializer, ser::SerializeMap};
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "state", content = "value", rename_all = "snake_case")]
@@ -88,20 +87,65 @@ pub struct State {
     pub presentation: Option<Presentation>,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct View {
+    pub app: Option<String>,
+    #[serde(serialize_with = "named")]
+    pub items: Vec<Item>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub presentation: Option<Presentation>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Views {
+    pub shared: View,
+    pub app: Option<View>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Snapshot {
+    pub revision: String,
+    pub document: Views,
+}
+
+impl View {
+    pub(crate) fn state(self, revision: String) -> State {
+        State {
+            revision,
+            app: self.app,
+            items: self.items,
+            presentation: self.presentation,
+        }
+    }
+}
+
 impl Runtime {
+    pub(crate) fn views(
+        &self,
+        identity: &Identity,
+        app: Option<&str>,
+        body: &Value,
+        device: crate::Device,
+    ) -> Result<Views, Error> {
+        let shared = self.evaluate(identity, None, body, device)?;
+        let app = app
+            .map(|name| self.evaluate(identity, Some(name), body, device))
+            .transpose()?;
+        Ok(Views { shared, app })
+    }
+
     pub(crate) fn evaluate(
         &self,
         identity: &Identity,
         app: Option<&str>,
-        record: &Record,
+        body: &Value,
         device: Device,
-    ) -> Result<State, Error> {
+    ) -> Result<View, Error> {
         let context = Context {
             identity,
             app,
-            values: record.value.root(),
+            values: body,
         };
-        let body = record.value.root();
         let shared = body
             .get("shared")
             .and_then(Value::as_object)
@@ -138,13 +182,20 @@ impl Runtime {
         } else {
             None
         };
-        Ok(State {
-            revision: record.head.token.clone(),
+        Ok(View {
             app: context.app.map(str::to_string),
             items,
             presentation,
         })
     }
+}
+
+fn named<S: Serializer>(items: &[Item], serializer: S) -> Result<S::Ok, S::Error> {
+    let mut map = serializer.serialize_map(Some(items.len()))?;
+    for item in items {
+        map.serialize_entry(&item.name, item)?;
+    }
+    map.end()
 }
 
 fn selected<'a>(

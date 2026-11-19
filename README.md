@@ -131,6 +131,28 @@ Errors use stable `error` categories: 401 unauthorized, 403 denied, 404 missing,
 409 conflict, 422 invalid and 503 unavailable/corrupt. Malformed HTTP input uses
 the router's extraction errors. No driver text enters response bodies.
 
+## Confirmed preferences document
+
+`GET /v1/me/documents/preferences?app=ensign&tone=dark` returns a single
+`revision` alongside `document.shared` and `document.app`. Each view contains
+its application name or null, evaluated `items` keyed by setting name, and the
+presentation when available. Within the returned document,
+`/app/items/theme.tone/effective` is a JSON Pointer with a literal dot in the
+setting key. Each item retains explicit declaration presence. For a shared-only request, omit `app` to receive `document.app: null`.
+Shared and app projections come from one authorized user-document snapshot.
+
+`PATCH` on the same route takes the existing `revision` and `changes` body.
+It returns the same envelope with the new revision and evaluated views of the
+committed values. Both requested views are evaluated before the conditional edit.
+Invalid changes, projection errors and stale heads leave values unchanged.
+The client can use the returned document and revision directly as its confirmed
+state. `tone` is a per-request device fact and the write still declares the scope
+of each change.
+
+Both methods require the caller's Ensign resource token and return
+`Cache-Control: no-store`. Signed-out callers can obtain defaults from their host
+application. The existing `/v1/me/settings` routes retain their response shape.
+
 ## Embed and deploy
 
 The public `folio` crate accepts explicit paths, `Catalog` declarations and a
