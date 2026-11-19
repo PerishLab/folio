@@ -6,7 +6,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
     routing::get,
 };
-use folio::{Auth, Error, Runtime, Write};
+use folio::{Auth, Device, Error, Runtime, Write};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -20,6 +20,13 @@ struct App {
 #[serde(deny_unknown_fields)]
 struct Selection {
     app: Option<String>,
+    tone: Option<String>,
+}
+
+impl Selection {
+    fn device(&self) -> Result<Device, Failure> {
+        Device::new(self.tone.as_deref()).map_err(failure)
+    }
 }
 
 type Failure = (StatusCode, Json<Value>);
@@ -81,8 +88,9 @@ impl App {
         headers: HeaderMap,
     ) -> Result<Json<folio::State>, Failure> {
         let identity = self.identity(&headers)?;
+        let device = selection.device()?;
         self.runtime
-            .read(&identity, selection.app.as_deref())
+            .render(&identity, selection.app.as_deref(), device)
             .await
             .map(Json)
             .map_err(failure)
@@ -95,9 +103,10 @@ impl App {
         headers: HeaderMap,
     ) -> Result<Json<Value>, Failure> {
         let identity = self.identity(&headers)?;
+        let device = selection.device()?;
         let state = self
             .runtime
-            .read(&identity, selection.app.as_deref())
+            .render(&identity, selection.app.as_deref(), device)
             .await
             .map_err(failure)?;
         let item = state
@@ -117,8 +126,9 @@ impl App {
         write: Write,
     ) -> Result<Json<folio::State>, Failure> {
         let identity = self.identity(&headers)?;
+        let device = selection.device()?;
         self.runtime
-            .write(&identity, selection.app.as_deref(), &write)
+            .submit(&identity, selection.app.as_deref(), &write, device)
             .await
             .map(Json)
             .map_err(failure)

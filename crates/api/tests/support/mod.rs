@@ -92,6 +92,13 @@ pub async fn call(router: &Router, ask: Request<Body>) -> (StatusCode, Value) {
     )
 }
 
+pub async fn shown(router: &Router, token: &str, query: &str) -> Value {
+    let path = format!("/v1/me/settings?app=ensign{query}");
+    let (status, body) = call(router, request("GET", &path, token, Value::Null)).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    body
+}
+
 pub async fn read(router: &Router, token: &str) -> Value {
     let (status, body) = call(
         router,

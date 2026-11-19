@@ -52,10 +52,41 @@ or `{"state":"present","value":...}`; explicit null is distinct from missing.
 trusted code policy in the selected context. Every write independently passes
 through the mapped operator's native Keel authority and can return 403.
 
-The initial executable declares `theme.family` (`google`, `material`; default
-`google`) and `theme.tone` (`system`, `light`, `dark`; default `system`), with the
-`ensign` application scope. These names describe preferences; Design owns the
-actual visual implementations.
+The initial executable declares `theme.family` (`google`, `google-accounts`,
+`google-workspace`, `material`; default `google`) and `theme.tone` (`system`,
+`light`, `dark`; default `system`), with the `ensign` application scope. These
+names describe preferences; Design owns the actual visual implementations.
+
+A response from the theme catalog also carries `presentation`, the explicit
+render a consumer hands to the Design Shell:
+
+```json
+{"system":"google-accounts","tone":"light","basis":"default"}
+```
+
+`system` is the closed Design system key for the effective family: the legacy
+preference `google` renders as `google-accounts`, and the other family names map
+to themselves. `tone` is only `light` or `dark`; the persistent `system`
+preference is resolved on the server, never in the browser. `basis` names what
+decided the tone: `setting` when an effective `light`/`dark` declaration (shared,
+application or policy) decided it, `device` when `system` followed the allowed
+device fact, and `default` when `system` had no device fact and light was chosen.
+
+The optional `tone=light|dark` query parameter carries that one allowed device
+fact and only applies while the effective preference is `system`. Any other
+value returns 422 `invalid` without touching the document; the parameter is
+never stored, so it cannot become a second preference or authority source. A
+client sends it only when it has such a fact and otherwise omits it, which yields
+the explicit `default` result. Explicit `light`/`dark` and trusted policy wins
+over the device fact.
+
+Documents written by 0.1 remain valid: the former `google` family stays an
+allowed, resolvable choice and the stored values keep their meaning. Moving to
+the explicit `google-accounts` or `google-workspace` family is an ordinary
+declaration change; nothing is rewritten in place. Presentation is projected
+by the theme catalog only, so a caller-supplied `Catalog` with unrelated
+`theme.family` and `theme.tone` definitions keeps its previous response shape
+and never fails on its own vocabulary.
 
 `PATCH /v1/me/settings?app=ensign` takes an opaque expected revision and changes:
 

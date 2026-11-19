@@ -31,6 +31,7 @@ pub struct Catalog {
     pub(crate) definitions: Vec<Definition>,
     apps: Vec<String>,
     policy: Policy,
+    pub(crate) presentation: bool,
 }
 
 impl Definition {
@@ -69,6 +70,7 @@ impl Catalog {
             definitions,
             apps,
             policy: Arc::new(|_, _| Decision::default()),
+            presentation: false,
         })
     }
 
@@ -117,7 +119,11 @@ impl Catalog {
 
     pub fn themes() -> Self {
         let definitions = [
-            ("theme.family", "google", vec!["google", "material"]),
+            (
+                "theme.family",
+                "google",
+                vec!["google", "google-accounts", "google-workspace", "material"],
+            ),
             ("theme.tone", "system", vec!["system", "light", "dark"]),
         ]
         .into_iter()
@@ -128,7 +134,10 @@ impl Catalog {
             options: options.into_iter().map(Value::from).collect(),
         })
         .collect();
-        Self::new(definitions, vec!["ensign".into()]).expect("static theme declarations")
+        let mut catalog =
+            Self::new(definitions, vec!["ensign".into()]).expect("static theme declarations");
+        catalog.presentation = true;
+        catalog
     }
 }
 
