@@ -16,7 +16,9 @@ pub use change::{Change, Patch, Scope, Write};
 pub use error::Error;
 pub use model::stock;
 pub use runtime::Runtime;
-pub use view::{Basis, Declared, Device, Item, Presentation, Source, State, Tone};
+pub use view::{
+    Basis, Declared, Device, Item, Presentation, Snapshot, Source, State, Tone, View, Views,
+};
 
 pub(crate) fn clock() -> Result<u64, Error> {
     std::time::SystemTime::now()

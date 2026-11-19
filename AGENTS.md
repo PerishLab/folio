@@ -27,7 +27,9 @@ identity. Design renders controlled component properties and user intents.
 - A mutation batch validates every change against declared settings and application
   scopes, computes one candidate document and publishes one expected-head edit.
   All changes in that user document commit together. Aggregate reads use that same
-  document snapshot; no multi-user transaction is promised.
+  document snapshot. The authenticated preferences document projects shared
+  and optional application views from one snapshot. Conditional writes verify
+  both requested views before publishing and return the committed revision.
 - Numeric-looking external subjects remain external strings. The qualified issuer
   and subject map to a local frozen Actor row. Anonymous native registration is
   reachable only after the API verifies an Ensign ES256 access token for the exact
