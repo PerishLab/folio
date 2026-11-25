@@ -23,10 +23,37 @@ impl Error {
             Self::Missing => "missing",
             Self::Conflict => "conflict",
             Self::Document(keel_document::Error::Conflict { .. }) => "conflict",
+            Self::Document(keel_document::Error::Missing) => "missing",
+            Self::Document(
+                keel_document::Error::Value { .. }
+                | keel_document::Error::Document(_)
+                | keel_document::Error::Patch { .. },
+            ) => "invalid",
+            Self::Document(keel_document::Error::Store(keel::adapt::Store::Taken(_))) => "conflict",
             Self::Document(keel_document::Error::Engine(_)) => "denied",
+            Self::Engine(keel::adapt::Error::Missing(_)) => "missing",
+            Self::Engine(keel::adapt::Error::Store(keel::adapt::Store::Taken(_))) => "conflict",
             Self::Engine(keel::adapt::Error::Adapt(_)) => "denied",
             _ => "unavailable",
         }
+    }
+
+    pub(crate) fn taken(&self) -> bool {
+        matches!(
+            self,
+            Self::Conflict
+                | Self::Engine(keel::adapt::Error::Store(keel::adapt::Store::Taken(_)))
+                | Self::Document(keel_document::Error::Store(keel::adapt::Store::Taken(_)))
+        ) || matches!(
+            self,
+            Self::Engine(keel::adapt::Error::Adapt(text))
+                | Self::Document(keel_document::Error::Engine(keel::adapt::Error::Adapt(text)))
+                if text.ends_with(" taken")
+        )
+    }
+
+    pub(crate) fn clash(self) -> Self {
+        if self.taken() { Self::Conflict } else { self }
     }
 }
 

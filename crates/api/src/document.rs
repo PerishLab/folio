@@ -45,7 +45,7 @@ async fn write(
         .map_err(failure)
 }
 
-async fn cache(mut response: Response) -> Response {
+pub(super) async fn cache(mut response: Response) -> Response {
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));

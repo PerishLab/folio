@@ -1,12 +1,13 @@
 use crate::{Catalog, Error};
+use jsonschema::Validator;
 use keel::{Core, Graph, Op, Row, adapt::db::Sqlite, atom::Kind, bond, form, spec::Spec};
 use keel_document::Store;
 use radicula_document::{Document, Value};
 use serde_json::{Map, json};
 
 pub(crate) const COLLECTION: &str = "schemas";
+pub(crate) const EDITION: &str = "template:edition";
 const DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
-const EDITION: &str = "template:edition";
 const NUMBER: &str = "1";
 
 pub(crate) fn stock(graph: &mut Graph) {
@@ -29,6 +30,10 @@ pub(crate) fn stock(graph: &mut Graph) {
             .freeze()
             .seal(),
     );
+}
+
+pub(crate) fn builtin(name: &str) -> bool {
+    matches!(name, "meta" | "theme" | "tags")
 }
 
 fn meta() -> Value {
@@ -61,18 +66,62 @@ fn theme() -> Value {
     })
 }
 
-fn bodies() -> Result<[(&'static str, Document); 2], Error> {
-    let meta = meta();
-    let check = jsonschema::draft202012::new(&meta).map_err(|_| Error::Corrupt)?;
-    let meta = json!({"schemaVersion": 1, "schema": meta});
-    let theme = json!({"schemaVersion": 1, "schema": theme()});
-    if !check.is_valid(&meta) || !check.is_valid(&theme) {
-        return Err(Error::Corrupt);
+fn tags() -> Value {
+    let item = json!({
+        "type": "object",
+        "properties": {
+            "label": {"type": "string", "minLength": 1},
+            "color": {"type": "string"}
+        },
+        "required": ["label"],
+        "additionalProperties": false
+    });
+    let map = json!({"type": "object", "additionalProperties": item});
+    json!({
+        "$schema": DIALECT,
+        "type": "object",
+        "properties": {"tags": map},
+        "required": ["tags"],
+        "additionalProperties": false
+    })
+}
+
+pub(crate) fn compile(schema: &Value) -> Result<Validator, Error> {
+    jsonschema::draft202012::new(schema).map_err(|_| Error::Invalid("schema".into()))
+}
+
+pub(crate) fn envelope(schema: &Value) -> Result<Document, Error> {
+    let check = jsonschema::draft202012::new(&meta()).map_err(|_| Error::Corrupt)?;
+    let wrapped = json!({"schemaVersion": 1, "schema": schema});
+    if !check.is_valid(&wrapped) {
+        return Err(Error::Invalid("schema".into()));
     }
-    Ok([
-        ("meta", Document::new(meta)?),
-        ("theme", Document::new(theme)?),
-    ])
+    compile(schema)?;
+    Document::new(wrapped).map_err(Into::into)
+}
+
+pub(crate) fn unwrap(body: &Value) -> Result<(i64, Value), Error> {
+    let version = body
+        .get("schemaVersion")
+        .and_then(Value::as_i64)
+        .ok_or(Error::Corrupt)?;
+    let schema = body.get("schema").cloned().ok_or(Error::Corrupt)?;
+    Ok((version, schema))
+}
+
+fn bodies() -> Result<[(&'static str, Document); 3], Error> {
+    let root = meta();
+    let check = jsonschema::draft202012::new(&root).map_err(|_| Error::Corrupt)?;
+    let items = [("meta", root), ("theme", theme()), ("tags", tags())];
+    let mut built = Vec::with_capacity(3);
+    for (name, schema) in items {
+        let wrapped = json!({"schemaVersion": 1, "schema": schema});
+        if !check.is_valid(&wrapped) || jsonschema::draft202012::new(&schema).is_err() {
+            return Err(Error::Corrupt);
+        }
+        built.push((name, Document::new(wrapped)?));
+    }
+    built.try_into().map_err(|_| Error::Corrupt)
 }
 
 pub(crate) async fn seed(core: &Core<Sqlite>, store: &Store<Sqlite>) -> Result<(), Error> {

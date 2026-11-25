@@ -17,6 +17,7 @@ audience = "folio"
 keys = "jwks.json"
 data = "data"
 listen = "127.0.0.1:8080"
+apps = []
 ```
 
 Register `folio` as an Ensign resource audience. The official `ensign-client`
@@ -32,18 +33,19 @@ folio-api serve /path/to/config
 ```
 
 Bootstrap initializes a vacant data directory or verifies a complete existing
-one. A new root includes the `meta` and `theme` templates at edition 1.
+one. A new root includes the `meta`, `theme` and `tags` templates at edition 1.
 Keel holds the template and edition identities and their document references.
 The `schemas` collection holds their Draft 2020-12 schema envelopes.
-Bootstrap validates the meta-schema against itself and checks both registered
-bodies. Reopening verifies the same resource and document bindings before
+Bootstrap validates the meta-schema against itself and checks all registered
+builtin bodies. Reopening verifies the same resource and document bindings before
 serving.
 
-Data roots created before template bootstrap use the preceding format. For the
-development cutover, set `data = "data-v1"` in `folio.toml` to select a new
-vacant directory, run `folio-api bootstrap /path/to/config`, then run
-`folio-api serve /path/to/config` and re-enter any needed test preferences.
-An existing root with a missing format marker refuses to start. Keep
+Data roots created before template, `tags`, and personal structured document
+bootstrap (including `folio:1`) use a preceding format (`folio:2` is current).
+For cutover, set `data = "data-v2"` in `folio.toml` to select a new vacant
+directory, run `folio-api bootstrap /path/to/config`, then run
+`folio-api serve /path/to/config`. An existing root with a missing or preceding
+format marker refuses to start without modifying `estate.sqlite3`. Keep
 `format`, `estate.sqlite3`, and `documents/` together when retaining a root.
 The settings routes and response shape continue to use the code Catalog.
 A single process holds the data root. SIGINT/SIGTERM drain requests before
@@ -67,7 +69,8 @@ through the mapped operator's native Keel authority and can return 403.
 
 The initial executable declares `theme.family` (`google`, `google-accounts`,
 `google-workspace`, `material`; default `google`) and `theme.tone` (`system`,
-`light`, `dark`; default `system`), with the `ensign` application scope. These
+`light`, `dark`; default `system`), with the built-in `ensign` and `folio`
+application scopes plus any optional validated slug scopes listed in `apps`. These
 names describe preferences; Design owns the actual visual implementations.
 
 A response from the theme catalog also carries `presentation`, the explicit
@@ -152,6 +155,34 @@ of each change.
 Both methods require the caller's Ensign resource token and return
 `Cache-Control: no-store`. Signed-out callers can obtain defaults from their host
 application. The existing `/v1/me/settings` routes retain their response shape.
+
+## Scopes, workbench, templates and structured documents
+
+- `GET /v1/scopes` returns the registered scopes (`shared`, built-in `ensign` and
+  `folio`, plus configured `apps` extensions) and catalog setting definitions.
+- `GET` and `PATCH /v1/me/documents/workbench?tone=<light|dark>` (`Cache-Control:
+  no-store`) return one atomic snapshot across `shared` and every registered
+  application scope (`document.scopes`, `document.shared`, `document.apps.<app>`),
+  accepting the same `{ revision, changes }` batch across any mix of scopes.
+- `GET /v1/templates`, `GET /v1/templates/{name}`, and
+  `GET /v1/templates/{name}/editions/{number}` inspect registered templates,
+  immutable editions, and Draft 2020-12 schemas via the operator's native Keel
+  Face.
+- `GET /v1/templates/{name}/status` runs a non-mutating quick-fail compatibility
+  check of the caller's visible documents against the template's `latest` Draft
+  2020-12 schema.
+- `POST /v1/templates` and `POST /v1/templates/{name}/editions` publish new
+  templates and immutable editions strictly for Keel-granted managers (`meta` is
+  immutable); schemas are validated against `meta` edition 1 and compiled as Draft
+  2020-12.
+- `GET` and `PATCH /v1/me/documents/tags` (`Cache-Control: no-store`) manage the
+  caller's map-by-slug `tags` document using Radicula JSON Pointer `operations`
+  validated against `tags` edition 1.
+- `GET` and `POST /v1/me/documents`, `GET`, `PATCH`, and `DELETE
+  /v1/me/documents/{id}`, and `POST /v1/me/documents/{id}/migrate` (`Cache-Control:
+  no-store`) manage personal structured documents bound to any non-`meta` template
+  edition with row-level owner isolation, Draft 2020-12 validation, optimistic CAS
+  revisions, and explicit quick-fail migration to `latest`.
 
 ## Embed and deploy
 

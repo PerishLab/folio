@@ -1,10 +1,69 @@
-use crate::{Error, schema};
+use crate::{Error, entry, schema};
 use keel::{Graph, atom::Kind, spec::Spec};
 use keel_document::{Collection, Field, Model, Shape};
+
+struct Grant {
+    who: &'static str,
+    verb: &'static str,
+    unit: &'static str,
+    scope: &'static str,
+}
+
+const GRANTS: &[Grant] = &[
+    Grant {
+        who: "anon",
+        verb: "put",
+        unit: "Actor",
+        scope: "all",
+    },
+    Grant {
+        who: "anon",
+        verb: "see",
+        unit: "Actor",
+        scope: "all",
+    },
+    Grant {
+        who: "all",
+        verb: "put",
+        unit: "documentstore:document",
+        scope: "pred collection = \"users\" and name = \"@me\"",
+    },
+    Grant {
+        who: "all",
+        verb: "put",
+        unit: "documentstore:document",
+        scope: "pred collection = \"tags\" and name = \"@me\"",
+    },
+    Grant {
+        who: "all",
+        verb: "see",
+        unit: "Template",
+        scope: "all",
+    },
+    Grant {
+        who: "all",
+        verb: "see",
+        unit: "template:edition",
+        scope: "all",
+    },
+    Grant {
+        who: "all",
+        verb: "see",
+        unit: "documentstore:document",
+        scope: "pred collection = \"schemas\"",
+    },
+    Grant {
+        who: "all",
+        verb: "put",
+        unit: "Entry",
+        scope: "pred owner = \"@me\"",
+    },
+];
 
 pub fn stock(graph: &mut Graph) {
     keel_document::stock(graph);
     schema::stock(graph);
+    entry::stock(graph);
     graph.add(
         Spec::build("Actor")
             .field("issuer", Kind::Text)
@@ -33,31 +92,23 @@ pub(crate) fn model() -> Result<Model, Error> {
         ]),
     )?;
     let schemas = Collection::new(schema::COLLECTION, Shape::Any)?;
-    Ok(Model::new(vec![users, schemas])?)
+    let tags = Collection::new(entry::TAGS, Shape::Any)?;
+    let entries = Collection::new(entry::ENTRIES, Shape::Any)?;
+    Ok(Model::new(vec![users, schemas, tags, entries])?)
 }
 
 pub(crate) async fn seed(core: &keel::Core<keel::adapt::db::Sqlite>) -> Result<(), Error> {
-    for verb in ["put", "see"] {
+    for grant in GRANTS {
         core.put(
             "@grant",
             &[
-                ("who", "anon"),
-                ("verb", verb),
-                ("unit", "Actor"),
-                ("scope", "all"),
+                ("who", grant.who),
+                ("verb", grant.verb),
+                ("unit", grant.unit),
+                ("scope", grant.scope),
             ],
         )
         .await?;
     }
-    core.put(
-        "@grant",
-        &[
-            ("who", "all"),
-            ("verb", "put"),
-            ("unit", "documentstore:document"),
-            ("scope", "pred name = \"@me\""),
-        ],
-    )
-    .await?;
     Ok(())
 }

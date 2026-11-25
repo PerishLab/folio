@@ -1,4 +1,9 @@
-use crate::{Catalog, Device, Error, Identity, Snapshot, State, Write, format, model, schema};
+mod board;
+pub(crate) mod format;
+
+pub use board::{Board, Workbench};
+
+use crate::{Catalog, Device, Error, Identity, Snapshot, State, Write, model, schema};
 use keel::adapt::db::Sqlite;
 use keel::{Core, Op, bind, bootstrap, form};
 use keel_document::{Condition, Projection, Query, Record, Store};
@@ -9,8 +14,8 @@ use std::sync::Arc;
 
 pub struct Runtime {
     pub(crate) catalog: Catalog,
-    core: Arc<Core<Sqlite>>,
-    store: Store<Sqlite>,
+    pub(crate) core: Arc<Core<Sqlite>>,
+    pub(crate) store: Store<Sqlite>,
     issuer: String,
 }
 
@@ -94,7 +99,7 @@ impl Runtime {
         Ok(self.core.anon().one(&tree).await?.map(|row| row.key()))
     }
 
-    async fn record(&self, actor: i64) -> Result<Record, Error> {
+    pub(crate) async fn record(&self, actor: i64) -> Result<Record, Error> {
         let query = Query {
             conditions: vec![Condition::Equal {
                 path: Path::parse("/owner")?,
@@ -215,7 +220,7 @@ impl Runtime {
         Ok(Snapshot { revision, document })
     }
 
-    async fn publish<T>(
+    pub(crate) async fn publish<T>(
         &self,
         identity: &Identity,
         write: &Write,

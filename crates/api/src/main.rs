@@ -1,9 +1,8 @@
 #![forbid(unsafe_code)]
 
-mod config;
-
+use api::config;
 use clap::{Parser, Subcommand};
-use folio::{Catalog, Runtime};
+use folio::Runtime;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -40,13 +39,14 @@ async fn run() -> Result<(), String> {
 
 async fn bootstrap(root: PathBuf) -> Result<(), String> {
     let settings = config::Settings::load(&root)?;
+    let catalog = settings.catalog()?;
     let data = settings.data(&root);
     if data.join("estate.sqlite3").is_file() {
-        Runtime::open(&data, Catalog::themes(), settings.issuer)
+        Runtime::open(&data, catalog, settings.issuer)
             .await
             .map_err(|error| error.to_string())?;
     } else {
-        Runtime::create(&data, Catalog::themes(), settings.issuer)
+        Runtime::create(&data, catalog, settings.issuer)
             .await
             .map_err(|error| error.to_string())?;
     }
@@ -55,8 +55,9 @@ async fn bootstrap(root: PathBuf) -> Result<(), String> {
 
 async fn serve(root: PathBuf) -> Result<(), String> {
     let settings = config::Settings::load(&root)?;
+    let catalog = settings.catalog()?;
     let auth = settings.auth(&root)?;
-    let runtime = Runtime::open(&settings.data(&root), Catalog::themes(), settings.issuer)
+    let runtime = Runtime::open(&settings.data(&root), catalog, settings.issuer)
         .await
         .map_err(|error| error.to_string())?;
     let listener = tokio::net::TcpListener::bind(&settings.listen)
