@@ -9,4 +9,7 @@ data:
     keys = "/config/jwks.json"
     data = "/data/state"
     listen = "0.0.0.0:8080"
+{{- if .Values.apps }}
+    apps = {{ .Values.apps | toJson }}
+{{- end }}
   jwks.json: {{ required "trusted public jwks is required" .Values.jwks | toJson | quote }}

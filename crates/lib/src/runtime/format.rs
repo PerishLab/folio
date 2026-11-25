@@ -3,7 +3,8 @@ use std::fs::OpenOptions;
 use std::io::{ErrorKind, Write};
 use std::path::Path;
 
-const MARK: &[u8] = b"folio:1\n";
+pub(crate) const NAME: &str = "folio:2";
+const MARK: &[u8] = b"folio:2\n";
 
 pub(crate) fn write(root: &Path) -> Result<(), Error> {
     let mut file = OpenOptions::new()

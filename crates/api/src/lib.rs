@@ -1,14 +1,18 @@
 #![forbid(unsafe_code)]
 
+pub mod config;
 mod document;
+mod entry;
+mod scope;
+mod template;
 
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
-    http::{HeaderMap, StatusCode},
+    extract::{FromRequestParts, Path, Query, State},
+    http::{HeaderMap, StatusCode, request::Parts},
     routing::get,
 };
-use folio::{Auth, Device, Error, Runtime, Write};
+use folio::{Auth, Device, Error, Identity, Runtime, Write};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -16,6 +20,42 @@ use std::sync::Arc;
 struct App {
     runtime: Runtime,
     auth: Auth,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Empty {}
+
+struct Caller(Identity);
+
+impl FromRequestParts<Arc<App>> for Caller {
+    type Rejection = Failure;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &Arc<App>,
+    ) -> Result<Self, Self::Rejection> {
+        state.identity(&parts.headers).map(Self)
+    }
+}
+
+struct Strict(Identity);
+
+impl FromRequestParts<Arc<App>> for Strict {
+    type Rejection = Failure;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &Arc<App>,
+    ) -> Result<Self, Self::Rejection> {
+        if Query::<Empty>::from_request_parts(parts, state)
+            .await
+            .is_err()
+        {
+            return Err((StatusCode::BAD_REQUEST, Json(json!({"error":"invalid"}))));
+        }
+        state.identity(&parts.headers).map(Self)
+    }
 }
 
 #[derive(Default, Deserialize)]
@@ -66,7 +106,21 @@ pub fn router(runtime: Runtime, auth: Auth) -> Router {
                 },
             ),
         )
+        .route("/v1/scopes", scope::scopes())
+        .route("/v1/templates", template::collection())
+        .route("/v1/templates/{name}", template::item())
+        .route("/v1/templates/{name}/editions", template::editions())
+        .route(
+            "/v1/templates/{name}/editions/{number}",
+            template::edition(),
+        )
+        .route("/v1/templates/{name}/status", template::status())
+        .route("/v1/me/documents", entry::collection())
         .route("/v1/me/documents/preferences", document::route())
+        .route("/v1/me/documents/workbench", scope::workbench())
+        .route("/v1/me/documents/tags", entry::tags())
+        .route("/v1/me/documents/{id}", entry::item())
+        .route("/v1/me/documents/{id}/migrate", entry::migrate())
         .with_state(Arc::new(App { runtime, auth }))
 }
 

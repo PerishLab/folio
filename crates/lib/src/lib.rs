@@ -3,19 +3,21 @@
 mod auth;
 mod catalog;
 mod change;
+mod entry;
 mod error;
-mod format;
 mod model;
 mod runtime;
 mod schema;
 mod view;
 
 pub use auth::{Auth, Identity};
-pub use catalog::{Catalog, Context, Decision, Definition};
+pub use catalog::{Catalog, Context, Decision, Definition, Scopes, Slot, Summary};
 pub use change::{Change, Patch, Scope, Write};
+pub use entry::{Amend, Draft, Entry, Listed, Listing, Migrate, Tags};
 pub use error::Error;
 pub use model::stock;
-pub use runtime::Runtime;
+pub use runtime::{Board, Runtime, Workbench};
+pub use schema::{Brief, Create, Detail, Edition, Fault, Publish, Status, Template, Templates};
 pub use view::{
     Basis, Declared, Device, Item, Presentation, Snapshot, Source, State, Tone, View, Views,
 };

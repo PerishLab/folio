@@ -73,12 +73,17 @@ pub async fn router(root: &std::path::Path, catalog: Catalog, keys: &Keys) -> Ro
 }
 
 pub fn request(method: &str, path: &str, token: &str, body: Value) -> Request<Body> {
+    let payload = if body.is_null() && matches!(method, "GET" | "DELETE") {
+        Body::empty()
+    } else {
+        Body::from(body.to_string())
+    };
     Request::builder()
         .method(method)
         .uri(path)
         .header("authorization", format!("Bearer {token}"))
         .header("content-type", "application/json")
-        .body(Body::from(body.to_string()))
+        .body(payload)
         .unwrap()
 }
 
@@ -126,4 +131,39 @@ pub fn shared() -> Value {
 }
 pub fn app() -> Value {
     json!({"kind":"app","name":"ensign"})
+}
+
+pub async fn grant(root: &std::path::Path, subject: &str) {
+    let mut graph = keel::Graph::new();
+    folio::stock(&mut graph);
+    let wire = keel::adapt::db::Sqlite::file(&root.join("estate.sqlite3"))
+        .await
+        .unwrap();
+    let core = keel::bind(graph, wire)
+        .await
+        .unwrap()
+        .identify("Actor")
+        .unwrap();
+    let query = keel::form("Actor")
+        .when("issuer", keel::Op::Eq, ISSUER)
+        .when("subject", keel::Op::Eq, subject);
+    let actor = core.one(&query).await.unwrap().unwrap().key().to_string();
+    let scopes = [
+        ("Template", "all"),
+        ("template:edition", "all"),
+        ("documentstore:document", "pred collection = \"schemas\""),
+    ];
+    for (unit, scope) in scopes {
+        core.put(
+            "@grant",
+            &[
+                ("who", actor.as_str()),
+                ("verb", "put"),
+                ("unit", unit),
+                ("scope", scope),
+            ],
+        )
+        .await
+        .unwrap();
+    }
 }

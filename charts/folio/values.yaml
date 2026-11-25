@@ -1,5 +1,6 @@
 issuer: ""
 audience: folio
+apps: []
 jwks: {}
 image:
   repository: ghcr.io/perishlab/folio

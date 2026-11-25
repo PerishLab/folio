@@ -131,7 +131,7 @@ impl Change {
 }
 
 impl Patch {
-    fn operation(&self) -> Result<Operation, Error> {
+    pub(crate) fn operation(&self) -> Result<Operation, Error> {
         Ok(match self {
             Self::Set { path, value } => Operation::Set {
                 path: Path::parse(path)?,

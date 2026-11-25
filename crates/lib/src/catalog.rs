@@ -1,6 +1,7 @@
 use crate::{Error, Identity};
 use keel_document::{Collection, Shape};
 use radicula_document::{Document, Value};
+use serde::Serialize;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -18,6 +19,26 @@ pub struct Definition {
     pub options: Vec<Value>,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Slot {
+    pub kind: String,
+    pub name: Option<String>,
+    pub builtin: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Summary {
+    pub name: String,
+    pub default: Value,
+    pub options: Vec<Value>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Scopes {
+    pub scopes: Vec<Slot>,
+    pub definitions: Vec<Summary>,
+}
+
 #[derive(Default)]
 pub struct Decision {
     pub options: Option<Vec<Value>>,
@@ -30,6 +51,7 @@ type Policy = Arc<dyn Fn(&Context<'_>, &Definition) -> Decision + Send + Sync>;
 pub struct Catalog {
     pub(crate) definitions: Vec<Definition>,
     apps: Vec<String>,
+    builtin: BTreeSet<String>,
     policy: Policy,
     pub(crate) presentation: bool,
 }
@@ -68,10 +90,57 @@ impl Catalog {
         }
         Ok(Self {
             definitions,
+            builtin: apps.iter().cloned().collect(),
             apps,
             policy: Arc::new(|_, _| Decision::default()),
             presentation: false,
         })
+    }
+
+    pub fn extend(mut self, apps: Vec<String>) -> Result<Self, Error> {
+        let mut seen = BTreeSet::new();
+        for app in apps {
+            if !slug(&app) || !seen.insert(app.clone()) {
+                return Err(Error::Invalid("application names".into()));
+            }
+            if !self.apps.contains(&app) {
+                self.apps.push(app);
+            }
+        }
+        Ok(self)
+    }
+
+    pub fn apps(&self) -> &[String] {
+        &self.apps
+    }
+
+    pub fn scopes(&self) -> Scopes {
+        let mut scopes = Vec::with_capacity(self.apps.len() + 1);
+        scopes.push(Slot {
+            kind: "shared".into(),
+            name: None,
+            builtin: true,
+        });
+        for app in &self.apps {
+            scopes.push(Slot {
+                kind: "app".into(),
+                name: Some(app.clone()),
+                builtin: self.builtin.contains(app),
+            });
+        }
+        let definitions = self
+            .definitions
+            .iter()
+            .map(|item| Summary {
+                name: item.name.clone(),
+                default: item.default.clone(),
+                options: item.options.clone(),
+            })
+            .collect();
+        Scopes {
+            scopes,
+            definitions,
+        }
     }
 
     pub fn policy(
@@ -134,18 +203,23 @@ impl Catalog {
             options: options.into_iter().map(Value::from).collect(),
         })
         .collect();
-        let mut catalog =
-            Self::new(definitions, vec!["ensign".into()]).expect("static theme declarations");
+        let mut catalog = Self::new(definitions, vec!["ensign".into(), "folio".into()])
+            .expect("static theme declarations");
         catalog.presentation = true;
         catalog
     }
 }
 
-fn slug(value: &str) -> bool {
-    !value.is_empty()
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+pub(crate) fn slug(value: &str) -> bool {
+    if value.is_empty() || value.len() > 64 {
+        return false;
+    }
+    if value.starts_with('-') || value.ends_with('-') {
+        return false;
+    }
+    value
+        .bytes()
+        .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
 }
 
 fn name(value: &str) -> bool {

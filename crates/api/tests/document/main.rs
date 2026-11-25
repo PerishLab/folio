@@ -1,9 +1,16 @@
+#[path = "../support/mod.rs"]
 mod support;
+
+mod entries;
+mod migrate;
+mod tags;
+mod templates;
+mod workbench;
 
 use axum::{
     Router,
-    body::to_bytes,
-    http::{StatusCode, header},
+    body::{Body, to_bytes},
+    http::{Request, StatusCode, header},
 };
 use folio::{Catalog, Decision, Definition};
 use keel_document::Shape;
@@ -13,16 +20,18 @@ use tower::ServiceExt;
 
 const DOCUMENT: &str = "/v1/me/documents/preferences?app=ensign&tone=dark";
 
-async fn exchange(router: &Router, method: &str, token: &str, body: Value) -> (StatusCode, Value) {
-    let response = router
-        .clone()
-        .oneshot(request(method, DOCUMENT, token, body))
-        .await
-        .unwrap();
+pub(crate) async fn stored(router: &Router, ask: Request<Body>) -> (StatusCode, Value) {
+    let response = router.clone().oneshot(ask).await.unwrap();
     assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
     let status = response.status();
     let bytes = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
-    (status, serde_json::from_slice(&bytes).unwrap())
+    let parsed =
+        serde_json::from_slice(&bytes).unwrap_or_else(|_| json!(String::from_utf8_lossy(&bytes)));
+    (status, parsed)
+}
+
+async fn exchange(router: &Router, method: &str, token: &str, body: Value) -> (StatusCode, Value) {
+    stored(router, request(method, DOCUMENT, token, body)).await
 }
 
 #[tokio::test]

@@ -45,8 +45,10 @@ async fn ready() {
     drop(runtime);
     let core = core(root).await;
     let before = names(&core).await;
-    assert_eq!(before.len(), 2);
+    assert_eq!(before.len(), 3);
     assert_ne!(before[0].1, before[1].1);
+    assert_ne!(before[1].1, before[2].1);
+    assert_ne!(before[0].1, before[2].1);
     drop(core);
     let runtime = open(root).await.unwrap();
     runtime.health().await.unwrap();
@@ -75,4 +77,16 @@ async fn missing() {
     core.end("template:edition", row).await.unwrap();
     drop(core);
     assert!(matches!(open(root).await, Err(Error::Corrupt)));
+}
+
+#[tokio::test]
+async fn preceding() {
+    let home = tempfile::tempdir().unwrap();
+    let root = home.path();
+    let estate = root.join("estate.sqlite3");
+    let bytes = b"preceding v0.3.0 estate";
+    std::fs::write(root.join("format"), b"folio:1\n").unwrap();
+    std::fs::write(&estate, bytes).unwrap();
+    assert!(matches!(open(root).await, Err(Error::Corrupt)));
+    assert_eq!(std::fs::read(&estate).unwrap(), bytes);
 }
