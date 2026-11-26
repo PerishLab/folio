@@ -1,5 +1,6 @@
 import type { Reply } from "@perishlab/radicula-document";
 import { forget } from "./authorization.ts";
+import { locus } from "./observe.ts";
 
 export const uncertain =
 	"保存结果尚未确认，已暂停继续写入；请先重新读取确认当前状态后再决定是否重新提交。";
@@ -61,6 +62,36 @@ async function category(response: Response): Promise<string | undefined> {
 	}
 }
 
+function clean(path: string): string {
+	return path.split(/[?#]/, 1)[0] || path;
+}
+
+async function perform(
+	fetcher: typeof fetch,
+	path: string,
+	init: RequestInit,
+	write: boolean,
+): Promise<Response> {
+	const method = init.method ?? "GET";
+	const target = clean(path);
+	let response: Response;
+	try {
+		response = await fetcher(path, init);
+	} catch (error) {
+		locus.fault(error, { method, path: target });
+		if (write) throw new Failure(0, uncertain, "uncertain", true);
+		throw new Failure(0, "网络请求中断，请重试。");
+	}
+	if (response.status >= 500) {
+		locus.fault(new Error(`HTTP ${response.status}`), {
+			method,
+			path: target,
+			status: response.status,
+		});
+	}
+	return response;
+}
+
 export async function request<T>(path: string, options: Options): Promise<T> {
 	const token = options.access();
 	if (!token) throw new Failure(401);
@@ -73,21 +104,19 @@ export async function request<T>(path: string, options: Options): Promise<T> {
 	const body =
 		options.body === undefined ? undefined : JSON.stringify(options.body);
 	if (body !== undefined) headers["content-type"] = "application/json";
-	let response: Response;
-	try {
-		response = await fetcher(path, {
-			method,
-			cache: "no-store",
-			credentials: "omit",
-			redirect: "error",
-			signal: AbortSignal.timeout(15000),
-			headers,
-			body,
-		});
-	} catch {
-		if (write) throw new Failure(0, uncertain, "uncertain", true);
-		throw new Failure(0, "网络请求中断，请重试。");
-	}
+	const init: RequestInit = {
+		method,
+		cache: "no-store",
+		credentials: "omit",
+		redirect: "error",
+		signal: AbortSignal.timeout(15000),
+		headers,
+		body,
+	};
+	const target = clean(path);
+	const response = await locus.with({ method, path: target }, () =>
+		locus.span("http.request", () => perform(fetcher, path, init, write))(),
+	);
 	if (response.status === 401) {
 		forget();
 		throw new Failure(401, undefined, await category(response));

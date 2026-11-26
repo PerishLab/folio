@@ -1,4 +1,7 @@
+#[path = "../support/mod.rs"]
 mod support;
+
+mod legacy;
 
 use axum::http::StatusCode;
 use folio::{Catalog, Decision, Runtime};

@@ -3,6 +3,7 @@
 use api::config;
 use clap::{Parser, Subcommand};
 use folio::Runtime;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -60,6 +61,7 @@ async fn serve(root: PathBuf) -> Result<(), String> {
     let settings = config::Settings::load(&root)?;
     let catalog = settings.catalog()?;
     let auth = settings.auth(&root)?;
+    let relay = settings.relay(&root)?;
     let runtime = Runtime::open(&settings.data(&root), catalog, settings.issuer)
         .await
         .map_err(|error| error.to_string())?;
@@ -71,10 +73,14 @@ async fn serve(root: PathBuf) -> Result<(), String> {
         "{}",
         serde_json::json!({ "role": "api", "endpoint": format!("http://{live}") })
     );
-    axum::serve(listener, api::router(runtime, auth))
-        .with_graceful_shutdown(shutdown())
-        .await
-        .map_err(|error| error.to_string())
+    let app = api::mount(runtime, auth, relay);
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown())
+    .await
+    .map_err(|error| error.to_string())
 }
 
 #[cfg(unix)]

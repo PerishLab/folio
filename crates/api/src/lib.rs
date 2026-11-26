@@ -3,6 +3,7 @@
 pub mod config;
 mod document;
 mod entry;
+pub mod observe;
 mod scope;
 mod template;
 
@@ -76,7 +77,11 @@ const PREFIX: &str = "/api";
 type Failure = (StatusCode, Json<Value>);
 
 pub fn router(runtime: Runtime, auth: Auth) -> Router {
-    let routes = Router::new()
+    mount(runtime, auth, None)
+}
+
+pub fn mount(runtime: Runtime, auth: Auth, relay: Option<observe::Relay>) -> Router {
+    let mut routes = Router::new()
         .route(
             "/health",
             get(|State(app): State<Arc<App>>| async move { app.health().await }),
@@ -124,6 +129,9 @@ pub fn router(runtime: Runtime, auth: Auth) -> Router {
         .route("/v1/me/documents/{id}", entry::item())
         .route("/v1/me/documents/{id}/migrate", entry::migrate())
         .with_state(Arc::new(App { runtime, auth }));
+    if let Some(relay) = relay {
+        routes = routes.nest("/observe", observe::router(relay));
+    }
     Router::new().nest(PREFIX, routes.clone()).merge(routes)
 }
 

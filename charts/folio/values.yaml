@@ -29,3 +29,14 @@ ingress:
   host: folio.local
   annotations: {}
   tls: []
+locus:
+  enabled: false
+  endpoint: ""
+  producer: folio-web
+  origins: []
+  forwarded: true
+  rpm: 120
+  burst: 30
+  keySecret:
+    name: ""
+    key: value

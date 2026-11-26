@@ -12,4 +12,16 @@ data:
 {{- if .Values.apps }}
     apps = {{ .Values.apps | toJson }}
 {{- end }}
+{{- if .Values.locus.enabled }}
+    [locus]
+    endpoint = {{ required "locus.endpoint is required when locus.enabled is true" .Values.locus.endpoint | toJson }}
+    producer = {{ .Values.locus.producer | toJson }}
+    buffer = "/data/locus-relay"
+{{- if .Values.locus.origins }}
+    origins = {{ join "," .Values.locus.origins | toJson }}
+{{- end }}
+    rpm = {{ .Values.locus.rpm }}
+    burst = {{ .Values.locus.burst }}
+    forwarded = {{ .Values.locus.forwarded }}
+{{- end }}
   jwks.json: {{ required "trusted public jwks is required" .Values.jwks | toJson | quote }}
