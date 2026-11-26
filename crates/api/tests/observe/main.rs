@@ -128,15 +128,29 @@ async fn config() {
     .unwrap();
     let missing = Settings::from(root.path(), &|_| None).unwrap();
     assert!(missing.relay(root.path()).is_err());
-    let envonly = Settings::from(root.path(), &|name| match name {
-        "API_LOCUS_KEY" => Some("env-secret-value".into()),
+    let primary = Settings::from(root.path(), &|name| match name {
+        "FOLIO_LOCUS_KEY" => Some("folio-secret-value".into()),
         _ => None,
     })
     .unwrap();
-    assert_eq!(envonly.locus.key, "env-secret-value");
-    let debug = format!("{:?}", envonly.locus);
-    assert!(debug.contains("[redacted]") && !debug.contains("env-secret-value"));
-    assert!(envonly.relay(root.path()).unwrap().is_some());
+    assert_eq!(primary.locus.key, "folio-secret-value");
+    let debug = format!("{:?}", primary.locus);
+    assert!(debug.contains("[redacted]") && !debug.contains("folio-secret-value"));
+    assert!(primary.relay(root.path()).unwrap().is_some());
+    let legacy = Settings::from(root.path(), &|name| match name {
+        "API_LOCUS_KEY" => Some("legacy-secret-value".into()),
+        _ => None,
+    })
+    .unwrap();
+    assert_eq!(legacy.locus.key, "legacy-secret-value");
+    assert!(legacy.relay(root.path()).unwrap().is_some());
+    let both = Settings::from(root.path(), &|name| match name {
+        "FOLIO_LOCUS_KEY" => Some("folio-wins".into()),
+        "API_LOCUS_KEY" => Some("legacy-loses".into()),
+        _ => None,
+    })
+    .unwrap();
+    assert_eq!(both.locus.key, "folio-wins");
     std::fs::write(root.path().join("writer.key"), format!("{SECRET}\n")).unwrap();
     std::fs::write(
         root.path().join("folio.toml"),

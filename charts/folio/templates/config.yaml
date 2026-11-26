@@ -1,3 +1,4 @@
+{{- $locus := .Values.locus | default dict }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -5,23 +6,23 @@ metadata:
 data:
   folio.toml: |
     issuer = {{ required "issuer is required" .Values.issuer | toJson }}
-    audience = {{ .Values.audience | toJson }}
+    audience = {{ .Values.audience | default "folio" | toJson }}
     keys = "/config/jwks.json"
     data = "/data/state"
     listen = "0.0.0.0:8080"
 {{- if .Values.apps }}
     apps = {{ .Values.apps | toJson }}
 {{- end }}
-{{- if .Values.locus.enabled }}
+{{- if $locus.enabled }}
     [locus]
-    endpoint = {{ required "locus.endpoint is required when locus.enabled is true" .Values.locus.endpoint | toJson }}
-    producer = {{ .Values.locus.producer | default "folio-web" | toJson }}
+    endpoint = {{ required "locus.endpoint is required when locus.enabled is true" $locus.endpoint | toJson }}
+    producer = {{ $locus.producer | default "folio-web" | toJson }}
     buffer = "/data/locus-relay"
-{{- if .Values.locus.origins }}
-    origins = {{ join "," .Values.locus.origins | toJson }}
+{{- if $locus.origins }}
+    origins = {{ join "," $locus.origins | toJson }}
 {{- end }}
-    rpm = {{ .Values.locus.rpm | default 120 }}
-    burst = {{ .Values.locus.burst | default 30 }}
-    forwarded = {{ if eq (toString .Values.locus.forwarded) "false" }}false{{ else }}true{{ end }}
+    rpm = {{ $locus.rpm | default 120 }}
+    burst = {{ $locus.burst | default 30 }}
+    forwarded = {{ if eq (toString $locus.forwarded) "false" }}false{{ else }}true{{ end }}
 {{- end }}
   jwks.json: {{ required "trusted public jwks is required" .Values.jwks | toJson | quote }}

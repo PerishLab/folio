@@ -1,3 +1,7 @@
+{{- $image := .Values.image | default dict }}
+{{- $storage := .Values.storage | default dict }}
+{{- $locus := .Values.locus | default dict }}
+{{- $keySecret := $locus.keySecret | default dict }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,10 +28,11 @@ spec:
         runAsUser: 10001
         runAsGroup: 10001
         fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
       initContainers:
         - name: bootstrap
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ $image.repository | default "ghcr.io/perishlab/folio" }}:{{ $image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ $image.pullPolicy | default "IfNotPresent" }}
           args: [bootstrap, /config]
           securityContext:
             allowPrivilegeEscalation: false
@@ -42,16 +47,16 @@ spec:
               mountPath: /data
       containers:
         - name: api
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ $image.repository | default "ghcr.io/perishlab/folio" }}:{{ $image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ $image.pullPolicy | default "IfNotPresent" }}
           args: [serve, /config]
-          {{- if and .Values.locus.enabled .Values.locus.keySecret.name }}
+          {{- if and $locus.enabled $keySecret.name }}
           env:
-            - name: API_LOCUS_KEY
+            - name: FOLIO_LOCUS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.locus.keySecret.name | quote }}
-                  key: {{ .Values.locus.keySecret.key | default "value" | quote }}
+                  name: {{ $keySecret.name | quote }}
+                  key: {{ $keySecret.key | default "value" | quote }}
           {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
@@ -88,4 +93,4 @@ spec:
             name: {{ .Release.Name }}-config
         - name: data
           persistentVolumeClaim:
-            claimName: {{ .Values.storage.existingClaim | default (printf "%s-data" .Release.Name) }}
+            claimName: {{ $storage.existingClaim | default (printf "%s-data" .Release.Name) }}

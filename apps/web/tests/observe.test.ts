@@ -4,7 +4,7 @@ import test from "node:test";
 import { gunzipSync } from "node:zlib";
 import { complete, configuration, forget, start } from "../authorization.ts";
 import { Failure, request } from "../client.ts";
-import { activate, locus, reset } from "../observe.ts";
+import { activate, endpoint, locus, reset } from "../observe.ts";
 
 type Atom = {
 	producer: string;
@@ -218,5 +218,51 @@ test("client request records faults on 500 and network errors without leaking be
 		assert.equal(serialized.includes("dropme"), false);
 	} finally {
 		await reset();
+	}
+});
+
+test("observe rejects non-relative, protocol-relative, whitespace, backslash, and control endpoints", async () => {
+	await reset();
+	const invalid = [
+		"https://evil.example/observe",
+		"http://evil.example/observe",
+		"//evil.example/observe",
+		"api/observe",
+		"/api/observe bad",
+		"/api/\tobserve",
+		"/api/\nobserve",
+		"/api/observe\u0000",
+		"/api/observe\u001f",
+		"/api/observe\u007f",
+		"/api/observe\u0085",
+		"/api\\observe",
+		"",
+		"   ",
+	];
+	let calls = 0;
+	const original = globalThis.fetch;
+	globalThis.fetch = async () => {
+		calls += 1;
+		return new Response(null, { status: 204 });
+	};
+	try {
+		assert.equal(endpoint(" /api/observe "), "/api/observe");
+		for (const candidate of invalid) {
+			assert.equal(endpoint(candidate), undefined, candidate);
+			activate(candidate);
+			locus.info("ignored");
+			await locus.flush();
+		}
+		assert.equal(calls, 0);
+		activate("/api/observe");
+		await configuration(async () =>
+			Response.json({ observe: "https://evil.example/observe" }),
+		);
+		locus.info("disabled");
+		await locus.flush();
+		assert.equal(calls, 0);
+	} finally {
+		await reset();
+		globalThis.fetch = original;
 	}
 });

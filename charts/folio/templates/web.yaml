@@ -1,20 +1,25 @@
-{{- if .Values.web.enabled }}
+{{- $web := .Values.web | default dict }}
+{{- if $web.enabled }}
+{{- $clientCfg := $web.client | default dict }}
+{{- $webImage := $web.image | default dict }}
+{{- $locus := .Values.locus | default dict }}
+{{- $webPort := $web.port | default 8080 }}
 {{- $client := dict }}
-{{- if .Values.web.client.client }}
-{{- $issuer := .Values.web.client.issuer | default .Values.issuer }}
-{{- $_ := set $client "client" .Values.web.client.client }}
+{{- if $clientCfg.client }}
+{{- $issuer := $clientCfg.issuer | default .Values.issuer }}
+{{- $_ := set $client "client" $clientCfg.client }}
 {{- if $issuer }}
 {{- $_ := set $client "issuer" $issuer }}
 {{- end }}
-{{- $audience := .Values.web.client.audience | default .Values.audience }}
+{{- $audience := $clientCfg.audience | default .Values.audience }}
 {{- if $audience }}
 {{- $_ := set $client "audience" $audience }}
 {{- end }}
-{{- if .Values.web.client.endpoint }}
-{{- $_ := set $client "endpoint" .Values.web.client.endpoint }}
+{{- if $clientCfg.endpoint }}
+{{- $_ := set $client "endpoint" $clientCfg.endpoint }}
 {{- end }}
 {{- end }}
-{{- if .Values.locus.enabled }}
+{{- if $locus.enabled }}
 {{- $_ := set $client "observe" "/api/observe" }}
 {{- end }}
 {{- $payload := $client | toJson }}
@@ -30,7 +35,7 @@ kind: Deployment
 metadata:
   name: {{ .Release.Name }}-web
 spec:
-  replicas: {{ .Values.web.replicas }}
+  replicas: {{ $web.replicas | default 1 }}
   selector:
     matchLabels:
       app.kubernetes.io/instance: {{ .Release.Name }}
@@ -49,10 +54,11 @@ spec:
         runAsUser: 10002
         runAsGroup: 10002
         fsGroup: 10002
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: web
-          image: "{{ .Values.web.image.repository }}:{{ .Values.web.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.web.image.pullPolicy }}
+          image: "{{ $webImage.repository | default "ghcr.io/perishlab/folio-web" }}:{{ $webImage.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ $webImage.pullPolicy | default "IfNotPresent" }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -62,10 +68,10 @@ spec:
             - name: HOST
               value: "0.0.0.0"
             - name: PORT
-              value: {{ .Values.web.port | quote }}
+              value: {{ $webPort | quote }}
           ports:
             - name: http
-              containerPort: {{ .Values.web.port }}
+              containerPort: {{ $webPort }}
           readinessProbe:
             httpGet:
               path: /health
@@ -103,6 +109,6 @@ spec:
     app.kubernetes.io/name: folio-web
   ports:
     - name: http
-      port: {{ .Values.web.port }}
+      port: {{ $webPort }}
       targetPort: http
 {{- end }}

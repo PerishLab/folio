@@ -199,19 +199,40 @@ fn config() {
         loaded.catalog().unwrap().apps(),
         &["ensign", "folio", "santi", "concord"]
     );
-    let overridden = api::config::Settings::from(dir.path(), &|key| {
-        if key == "API_APPS" {
-            Some("alpha, beta".into())
-        } else {
-            None
-        }
+    let primary = api::config::Settings::from(dir.path(), &|key| match key {
+        "FOLIO_APPS" => Some("gamma, delta".into()),
+        _ => None,
     })
     .unwrap();
-    assert_eq!(overridden.apps, vec!["alpha", "beta"]);
+    assert_eq!(primary.apps, vec!["gamma", "delta"]);
     assert_eq!(
-        overridden.catalog().unwrap().apps(),
+        primary.catalog().unwrap().apps(),
+        &["ensign", "folio", "gamma", "delta"]
+    );
+    let legacy = api::config::Settings::from(dir.path(), &|key| match key {
+        "API_APPS" => Some("alpha, beta".into()),
+        _ => None,
+    })
+    .unwrap();
+    assert_eq!(legacy.apps, vec!["alpha", "beta"]);
+    assert_eq!(
+        legacy.catalog().unwrap().apps(),
         &["ensign", "folio", "alpha", "beta"]
     );
+    let both = api::config::Settings::from(dir.path(), &|key| match key {
+        "FOLIO_APPS" => Some("gamma".into()),
+        "API_APPS" => Some("alpha".into()),
+        _ => None,
+    })
+    .unwrap();
+    assert_eq!(both.apps, vec!["gamma"]);
+    let blank = api::config::Settings::from(dir.path(), &|key| match key {
+        "FOLIO_APPS" => Some("   ".into()),
+        "API_APPS" => Some("alpha".into()),
+        _ => None,
+    })
+    .unwrap();
+    assert_eq!(blank.apps, vec!["alpha"]);
     let sidecar = api::config::Settings::from(dir.path(), &|key| {
         if key == "SIDECAR_PORT" {
             Some("4312".into())
