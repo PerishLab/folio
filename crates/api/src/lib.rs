@@ -3,7 +3,6 @@
 pub mod config;
 mod document;
 mod entry;
-pub mod observe;
 mod scope;
 mod template;
 
@@ -80,7 +79,7 @@ pub fn router(runtime: Runtime, auth: Auth) -> Router {
     mount(runtime, auth, None)
 }
 
-pub fn mount(runtime: Runtime, auth: Auth, relay: Option<observe::Relay>) -> Router {
+pub fn mount(runtime: Runtime, auth: Auth, relay: Option<locus_relay::Relay>) -> Router {
     let mut routes = Router::new()
         .route(
             "/health",
@@ -130,7 +129,7 @@ pub fn mount(runtime: Runtime, auth: Auth, relay: Option<observe::Relay>) -> Rou
         .route("/v1/me/documents/{id}/migrate", entry::migrate())
         .with_state(Arc::new(App { runtime, auth }));
     if let Some(relay) = relay {
-        routes = routes.nest("/observe", observe::router(relay));
+        routes = routes.nest("/observe", locus_relay::router(relay));
     }
     Router::new().nest(PREFIX, routes.clone()).merge(routes)
 }

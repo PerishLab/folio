@@ -18,9 +18,9 @@ clap.workspace = true
 plumb.workspace = true
 radicula-config.workspace = true
 locus.workspace = true
-flate2.workspace = true
-url.workspace = true
+locus-relay.workspace = true
 [dev-dependencies]
+flate2.workspace = true
 tempfile.workspace = true
 tower.workspace = true
 radicula-oidc.workspace = true
