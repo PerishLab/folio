@@ -4,7 +4,6 @@ mod support;
 mod gates;
 
 use api::config::Settings;
-use api::observe::{Relay, Spec};
 use axum::{
     Router,
     body::Body,
@@ -14,6 +13,7 @@ use axum::{
 };
 use flate2::{Compression, write::GzEncoder};
 use folio::{Catalog, Runtime};
+use locus_relay::{Config, Relay};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::io::Write;
@@ -43,26 +43,21 @@ pub(crate) fn gzip(data: &[u8]) -> Vec<u8> {
     encoder.finish().unwrap()
 }
 
-pub(crate) async fn setup(root: &std::path::Path, spec: Spec) -> (Router, Relay) {
+pub(crate) async fn setup(root: &std::path::Path, config: Config) -> (Router, Relay) {
     let keys = Keys::new();
     let runtime = Runtime::create(root, Catalog::themes(), support::ISSUER.into())
         .await
         .unwrap();
-    let relay = Relay::open(spec).unwrap();
+    let relay = Relay::open(config).unwrap();
     (api::mount(runtime, keys.auth(), Some(relay.clone())), relay)
 }
 
-pub(crate) fn spec(root: &std::path::Path, endpoint: &str) -> Spec {
-    Spec {
-        endpoint: endpoint.into(),
-        key: SECRET.into(),
-        producer: PRODUCER.into(),
-        buffer: root.join("relay"),
-        origins: vec!["https://folio.example".into()],
-        rpm: 120,
-        burst: 30,
-        forwarded: false,
-    }
+pub(crate) fn spec(root: &std::path::Path, endpoint: &str) -> Config {
+    Config::new(endpoint, SECRET, PRODUCER, root.join("relay"))
+        .origins(vec!["https://folio.example".into()])
+        .rpm(120)
+        .burst(30)
+        .forwarded(false)
 }
 
 pub(crate) fn postreq(uri: &str, body: Body) -> Request<Body> {

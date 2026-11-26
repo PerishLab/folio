@@ -15,9 +15,9 @@ radicula-oidc = { version = "0", registry = "perish" }
 radicula-config = { version = "0", registry = "perish" }
 plumb = { version = "0", registry = "perish" }
 locus = { version = "0", registry = "perish" }
+locus-relay = { version = "0", registry = "perish" }
 axum = "0.8"
 flate2 = "1"
-url = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 jsonschema = { version = "0.61", default-features = false }

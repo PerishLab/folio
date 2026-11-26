@@ -128,7 +128,7 @@ impl Settings {
             .map_err(|error| error.to_string())
     }
 
-    pub fn relay(&self, root: &Path) -> Result<Option<crate::observe::Relay>, String> {
+    pub fn relay(&self, root: &Path) -> Result<Option<locus_relay::Relay>, String> {
         let endpoint = self.locus.endpoint.trim();
         if endpoint.is_empty() {
             return Ok(None);
@@ -143,17 +143,19 @@ impl Settings {
             .filter(|entry| !entry.is_empty())
             .map(str::to_owned)
             .collect();
-        let spec = crate::observe::Spec {
-            endpoint: endpoint.to_owned(),
+        let config = locus_relay::Config::new(
+            endpoint.to_owned(),
             key,
-            producer: self.locus.producer.trim().to_owned(),
+            self.locus.producer.trim().to_owned(),
             buffer,
-            origins,
-            rpm: self.locus.rpm,
-            burst: self.locus.burst,
-            forwarded: self.locus.forwarded,
-        };
-        crate::observe::Relay::open(spec).map(Some)
+        )
+        .origins(origins)
+        .rpm(self.locus.rpm)
+        .burst(self.locus.burst)
+        .forwarded(self.locus.forwarded);
+        locus_relay::Relay::open(config)
+            .map(Some)
+            .map_err(|error| error.to_string())
     }
 }
 

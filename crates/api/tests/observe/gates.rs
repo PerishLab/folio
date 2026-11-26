@@ -9,11 +9,9 @@ use tower::ServiceExt;
 #[tokio::test]
 async fn origins() {
     let root = tempfile::tempdir().unwrap();
-    let (app, _relay) = setup(
-        &root.path().join("data"),
-        spec(root.path(), "https://api.locus.example"),
-    )
-    .await;
+    let cfg = spec(root.path(), "https://api.locus.example")
+        .origins(vec!["HTTPS://FOLIO.EXAMPLE:443".into()]);
+    let (app, _relay) = setup(&root.path().join("data"), cfg).await;
     let line = atom("1", PRODUCER, json!({"message": "ok"}));
     let cases = [
         (
@@ -29,7 +27,7 @@ async fn origins() {
         ),
         (
             "SAME-ORIGIN",
-            Some("HTTPS://FOLIO.EXAMPLE:443"),
+            Some("https://folio.example"),
             StatusCode::NO_CONTENT,
         ),
     ];
