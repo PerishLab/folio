@@ -145,6 +145,16 @@ test("callback emits structured diagnostics without leaking secrets", async () =
 			"/documents",
 		);
 		await locus.flush();
+		const started = sink.atoms.find(
+			(atom) =>
+				atom.context["locus.schema"] === "locus.log" &&
+				atom.payload?.message === "auth start stored",
+		);
+		assert.ok(started);
+		assert.equal(started.context.verified, "true");
+		assert.equal(started.context.keys, "1");
+		assert.ok(started.context.browser);
+		assert.ok(started.context.navigation);
 		const series = sink.atoms
 			.filter((atom) => atom.context["metric.name"] === "auth.callback")
 			.map((atom) => atom.context["metric.series"]);
