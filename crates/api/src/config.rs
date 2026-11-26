@@ -1,5 +1,53 @@
 use radicula_config::Cascade;
+use std::fmt;
 use std::path::{Path, PathBuf};
+
+#[derive(Clone, Cascade)]
+#[cascade(section)]
+pub struct Locus {
+    pub endpoint: String,
+    pub key: String,
+    pub keyfile: String,
+    pub producer: String,
+    pub buffer: String,
+    pub origins: String,
+    pub rpm: u32,
+    pub burst: u32,
+    pub forwarded: bool,
+}
+
+impl Default for Locus {
+    fn default() -> Self {
+        Self {
+            endpoint: String::new(),
+            key: String::new(),
+            keyfile: String::new(),
+            producer: "folio-web".into(),
+            buffer: "locus-relay".into(),
+            origins: String::new(),
+            rpm: 120,
+            burst: 30,
+            forwarded: false,
+        }
+    }
+}
+
+impl fmt::Debug for Locus {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Locus")
+            .field("endpoint", &self.endpoint)
+            .field("key", &"[redacted]")
+            .field("keyfile", &self.keyfile)
+            .field("producer", &self.producer)
+            .field("buffer", &self.buffer)
+            .field("origins", &self.origins)
+            .field("rpm", &self.rpm)
+            .field("burst", &self.burst)
+            .field("forwarded", &self.forwarded)
+            .finish()
+    }
+}
 
 #[derive(Debug, Cascade)]
 #[plumb::config::prefix]
@@ -10,6 +58,8 @@ pub struct Settings {
     pub data: String,
     pub listen: String,
     pub apps: Vec<String>,
+    #[cascade(section)]
+    pub locus: Locus,
 }
 
 impl Default for Settings {
@@ -21,6 +71,7 @@ impl Default for Settings {
             data: "data".into(),
             listen: "127.0.0.1:8080".into(),
             apps: Vec::new(),
+            locus: Locus::default(),
         }
     }
 }
@@ -75,6 +126,51 @@ impl Settings {
         folio::Auth::new(self.issuer.clone(), self.audience.clone(), &keys)
             .map_err(|error| error.to_string())
     }
+
+    pub fn relay(&self, root: &Path) -> Result<Option<crate::observe::Relay>, String> {
+        let endpoint = self.locus.endpoint.trim();
+        if endpoint.is_empty() {
+            return Ok(None);
+        }
+        let key = secret(&self.locus, root)?;
+        let buffer = absolute(plumb::config::rebase(Path::new(&self.locus.buffer), root))?;
+        let origins = self
+            .locus
+            .origins
+            .split(',')
+            .map(str::trim)
+            .filter(|entry| !entry.is_empty())
+            .map(str::to_owned)
+            .collect();
+        let spec = crate::observe::Spec {
+            endpoint: endpoint.to_owned(),
+            key,
+            producer: self.locus.producer.trim().to_owned(),
+            buffer,
+            origins,
+            rpm: self.locus.rpm,
+            burst: self.locus.burst,
+            forwarded: self.locus.forwarded,
+        };
+        crate::observe::Relay::open(spec).map(Some)
+    }
+}
+
+fn secret(locus: &Locus, root: &Path) -> Result<String, String> {
+    let direct = locus.key.trim();
+    if !direct.is_empty() {
+        return Ok(direct.to_owned());
+    }
+    let file = locus.keyfile.trim();
+    if file.is_empty() {
+        return Err("locus key or keyfile is required".into());
+    }
+    let path = plumb::config::rebase(Path::new(file), root);
+    locus::delivery::transport::secret(&path)
+}
+
+fn absolute(path: PathBuf) -> Result<PathBuf, String> {
+    std::path::absolute(path).map_err(|error| error.to_string())
 }
 
 fn bind(listen: &str, port: u16) -> String {

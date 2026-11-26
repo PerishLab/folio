@@ -1,9 +1,7 @@
-mod support;
-
+use crate::support::*;
 use axum::http::StatusCode;
 use folio::{Catalog, Runtime};
 use serde_json::json;
-use support::*;
 
 #[tokio::test]
 async fn stored() {

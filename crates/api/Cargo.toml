@@ -17,6 +17,9 @@ tokio.workspace = true
 clap.workspace = true
 plumb.workspace = true
 radicula-config.workspace = true
+locus.workspace = true
+flate2.workspace = true
+url.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 tower.workspace = true

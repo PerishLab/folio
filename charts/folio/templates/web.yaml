@@ -14,6 +14,9 @@
 {{- $_ := set $client "endpoint" .Values.web.client.endpoint }}
 {{- end }}
 {{- end }}
+{{- if .Values.locus.enabled }}
+{{- $_ := set $client "observe" "/api/observe" }}
+{{- end }}
 {{- $payload := $client | toJson }}
 apiVersion: v1
 kind: ConfigMap
