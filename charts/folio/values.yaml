@@ -10,3 +10,22 @@ storage:
   size: 1Gi
   className: ""
   existingClaim: ""
+web:
+  enabled: true
+  replicas: 1
+  port: 8080
+  image:
+    repository: ghcr.io/perishlab/folio-web
+    tag: ""
+    pullPolicy: IfNotPresent
+  client:
+    issuer: ""
+    client: ""
+    audience: folio
+    endpoint: ""
+ingress:
+  enabled: false
+  className: ""
+  host: folio.local
+  annotations: {}
+  tls: []

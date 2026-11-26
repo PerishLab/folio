@@ -33,6 +33,15 @@ async fn scopes() {
         ])
     );
     assert_eq!(body["definitions"].as_array().unwrap().len(), 2);
+    let (health, _) = call(&router, request("GET", "/api/health", "", Value::Null)).await;
+    assert_eq!(health, StatusCode::OK);
+    let (nested, prefixed) = call(
+        &router,
+        request("GET", "/api/v1/scopes", &token, Value::Null),
+    )
+    .await;
+    assert_eq!(nested, StatusCode::OK);
+    assert_eq!(prefixed, body);
 }
 
 #[tokio::test]
@@ -203,4 +212,13 @@ fn config() {
         overridden.catalog().unwrap().apps(),
         &["ensign", "folio", "alpha", "beta"]
     );
+    let sidecar = api::config::Settings::from(dir.path(), &|key| {
+        if key == "SIDECAR_PORT" {
+            Some("4312".into())
+        } else {
+            None
+        }
+    })
+    .unwrap();
+    assert_eq!(sidecar.listen, "127.0.0.1:4312");
 }

@@ -71,10 +71,12 @@ impl Selection {
     }
 }
 
+const PREFIX: &str = "/api";
+
 type Failure = (StatusCode, Json<Value>);
 
 pub fn router(runtime: Runtime, auth: Auth) -> Router {
-    Router::new()
+    let routes = Router::new()
         .route(
             "/health",
             get(|State(app): State<Arc<App>>| async move { app.health().await }),
@@ -121,7 +123,8 @@ pub fn router(runtime: Runtime, auth: Auth) -> Router {
         .route("/v1/me/documents/tags", entry::tags())
         .route("/v1/me/documents/{id}", entry::item())
         .route("/v1/me/documents/{id}/migrate", entry::migrate())
-        .with_state(Arc::new(App { runtime, auth }))
+        .with_state(Arc::new(App { runtime, auth }));
+    Router::new().nest(PREFIX, routes.clone()).merge(routes)
 }
 
 impl App {
