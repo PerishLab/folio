@@ -1,15 +1,27 @@
+[[ban]]
+paths = [
+    "apps/web/src/lib/components/**",
+    "apps/web/src/views/**",
+]
+syntax = "style"
+
 [comment]
 allow = false
 
 [[grant]]
 paths = [
+    "apps/*/tests/**/*.test.ts",
     "crates/*/src/**/*.rs",
     "crates/*/tests/**/*.rs",
 ]
 syntax = "test"
 
 [[grant]]
-paths = ["crates/*/tests/**/*.rs"]
+paths = [
+    "apps/*/tests/**/*.test.ts",
+    "apps/web/vite.config.ts",
+    "crates/*/tests/**/*.rs",
+]
 syntax = "environment"
 
 [limit]
@@ -22,16 +34,27 @@ path = 3
 
 [module]
 roots = [
+    "apps/*",
+    "apps/*/src",
+    "apps/*/tests",
     "crates/*/src",
     "crates/*/tests",
 ]
 
 [scan]
-exclude = ["**/target/**"]
+exclude = [
+    "**/.svelte-kit/**",
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/target/**",
+]
 include = [
+    "apps/**/*.css",
+    "apps/**/*.scss",
+    "apps/**/*.svelte",
+    "apps/**/*.ts",
     "crates/**/*.rs",
 ]
-
 
 [word]
 single = true

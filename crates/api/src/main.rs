@@ -10,6 +10,8 @@ use std::path::PathBuf;
 struct Cli {
     #[command(subcommand)]
     command: Command,
+    #[arg(long = "sidecar-stamp", hide = true, global = true)]
+    stamp: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -31,6 +33,7 @@ async fn run() -> Result<(), String> {
     plumb::identity!("FOLIO")?;
     let cli = Cli::parse();
     plumb::identity::ready()?;
+    let _stamp = cli.stamp;
     match cli.command {
         Command::Bootstrap { root } => bootstrap(root).await,
         Command::Serve { root } => serve(root).await,
@@ -63,9 +66,10 @@ async fn serve(root: PathBuf) -> Result<(), String> {
     let listener = tokio::net::TcpListener::bind(&settings.listen)
         .await
         .map_err(|error| error.to_string())?;
+    let live = listener.local_addr().map_err(|error| error.to_string())?;
     eprintln!(
-        "folio-api: listening {}",
-        listener.local_addr().map_err(|error| error.to_string())?
+        "{}",
+        serde_json::json!({ "role": "api", "endpoint": format!("http://{live}") })
     );
     axum::serve(listener, api::router(runtime, auth))
         .with_graceful_shutdown(shutdown())

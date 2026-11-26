@@ -192,9 +192,20 @@ mapping qualifies issuer plus external subject, never treats a numeric subject
 as a native row id, and persists that mapping across restarts. There is no
 cross-user transaction or distributed storage promise.
 
-Wharf distributes the crate, Linux `folio-api`, its OCI image and `charts/folio`
-through Plumb's declaration. The Helm chart runs one replica with Recreate,
-initializes the data root in an init container and mounts a public JWKS ConfigMap
-and one persistent volume. Supply `issuer` and `jwks`, and select an existing
-claim or storage class. Add routing in the consuming environment's declaration.
-Do not mount Ensign signing keys, sudo custody or held login bearers.
+Wharf distributes the crate, Linux `folio-api`, dual OCI images (`perishlab/folio`
+for the API and `perishlab/folio-web` for `apps/web`), and `charts/folio` through
+Plumb's declaration. `apps/web` is an independent Svelte + `@perishlab/design` web
+surface serving the Domain-Wide Settings Center (`/`), Tags (`/tags`), Templates &
+Draft 2020-12 Schema (`/templates`), Structured Personal Documents (`/documents`),
+and OIDC PKCE callback (`/callback`). It exchanges an Ensign resource access token
+(`resource=folio`) held strictly in browser memory and reads runtime OIDC parameters
+from `/client.json` (`{}` when unconfigured).
+
+The Helm chart enables the web surface by default (`web.enabled: true`), mounts
+`/web/dist/client.json` from a ConfigMap, runs the API with one Recreate replica,
+initializes the data root in an init container, and mounts a public JWKS ConfigMap
+and one persistent volume. When `ingress.enabled: true`, the chart routes `/api`
+and `/v1` to the API Service and `/` to the Web Service (or `/` directly to the
+API when `web.enabled: false`). Supply `issuer`, `jwks`, and `web.client.client`,
+and select an existing claim or storage class. Do not mount Ensign signing keys,
+sudo custody or held login bearers.

@@ -43,6 +43,15 @@ impl Settings {
                     .collect();
             }
         }
+        if let Some(raw) = get("SIDECAR_PORT") {
+            let trimmed = raw.trim();
+            if !trimmed.is_empty() {
+                let port: u16 = trimmed
+                    .parse()
+                    .map_err(|_| "SIDECAR_PORT must be a valid port".to_string())?;
+                settings.listen = bind(&settings.listen, port);
+            }
+        }
         if settings.issuer.is_empty() || settings.audience.is_empty() {
             return Err("issuer and audience are required".into());
         }
@@ -65,5 +74,12 @@ impl Settings {
         let keys = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
         folio::Auth::new(self.issuer.clone(), self.audience.clone(), &keys)
             .map_err(|error| error.to_string())
+    }
+}
+
+fn bind(listen: &str, port: u16) -> String {
+    match listen.rsplit_once(':') {
+        Some((host, _)) if !host.is_empty() => format!("{host}:{port}"),
+        _ => format!("127.0.0.1:{port}"),
     }
 }

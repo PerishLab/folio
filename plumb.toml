@@ -1,41 +1,74 @@
 [identity]
 ns = "folio"
+
 [release]
 authority = "https://releases.folio.perish.uk"
 binaries = ["folio-api"]
 targets = ["x86_64-unknown-linux-gnu"]
 skill = false
+
 [release.cargo]
 registry = "perish"
 packages = ["folio"]
+
 [release.oci]
 registry = "ghcr.io"
-image = "perishlab/folio"
 account = "PerishLab"
+
+[release.oci.components.api]
+image = "perishlab/folio"
 binary = "folio-api"
+
+[release.oci.components.web]
+image = "perishlab/folio-web"
+web = "apps/web"
+file = "deploy/web.Dockerfile"
+
 [release.chart]
 registry = "ghcr.io"
 chart = "perishlab/folio"
 account = "PerishLab"
+
 [layout]
 [[layout.seat]]
 path = "crates/*"
 anchor = ["Cargo.toml"]
 note = "Settings control library and API service."
+
 [[layout.seat]]
-path = ".cargo"
-note = "Public registry configuration."
-[[layout.file]]
-name = ["Cargo.toml", "Cargo.lock"]
-note = "Workspace and dependency resolution."
-[[layout.file]]
-name = ["Containerfile"]
-note = "API image built from its formal binary."
+path = "apps/*"
+anchor = []
+note = "Independent Web application and its tests."
+
+[[layout.seat]]
+path = "deploy"
+note = "Web image build context and deployment assets."
 
 [[layout.seat]]
 path = "charts/*"
 anchor = ["Chart.yaml"]
 note = "Formal Helm service declaration."
+
+[[layout.seat]]
+path = ".cargo"
+note = "Public registry configuration."
+
+[[layout.file]]
+name = ["Cargo.toml", "Cargo.lock"]
+note = "Workspace and dependency resolution."
+
+[[layout.file]]
+name = [".npmrc", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "biome.json"]
+note = "Workspace anchors held for the web plane."
+
+[[layout.file]]
+name = ["Containerfile"]
+note = "API image built from its formal binary."
+
+[[layout.file]]
+name = ["sidecar.toml"]
+note = "Local sidecar dispatch configuration."
+
 [[layout.file]]
 name = ["README.md"]
 note = "Public API and deployment entry."

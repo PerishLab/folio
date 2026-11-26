@@ -1,0 +1,13 @@
+{
+	"name": "folio",
+	"private": true,
+	"scripts": {
+		"build": "pnpm -r build",
+		"test": "pnpm -r test",
+		"check": "biome check .",
+		"typecheck": "pnpm -r typecheck"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "catalog:"
+	}
+}

@@ -1,0 +1,105 @@
+{{- if .Values.web.enabled }}
+{{- $client := dict }}
+{{- if .Values.web.client.client }}
+{{- $issuer := .Values.web.client.issuer | default .Values.issuer }}
+{{- $_ := set $client "client" .Values.web.client.client }}
+{{- if $issuer }}
+{{- $_ := set $client "issuer" $issuer }}
+{{- end }}
+{{- $audience := .Values.web.client.audience | default .Values.audience }}
+{{- if $audience }}
+{{- $_ := set $client "audience" $audience }}
+{{- end }}
+{{- if .Values.web.client.endpoint }}
+{{- $_ := set $client "endpoint" .Values.web.client.endpoint }}
+{{- end }}
+{{- end }}
+{{- $payload := $client | toJson }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-web-client
+data:
+  client.json: {{ $payload | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-web
+spec:
+  replicas: {{ .Values.web.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/name: folio-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/name: folio-web
+      annotations:
+        checksum/client: {{ $payload | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10002
+        runAsGroup: 10002
+        fsGroup: 10002
+      containers:
+        - name: web
+          image: "{{ .Values.web.image.repository }}:{{ .Values.web.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.web.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: HOST
+              value: "0.0.0.0"
+            - name: PORT
+              value: {{ .Values.web.port | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.web.port }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: client
+              mountPath: /web/dist/client.json
+              subPath: client.json
+              readOnly: true
+      volumes:
+        - name: client
+          configMap:
+            name: {{ .Release.Name }}-web-client
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-web
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/name: folio-web
+  ports:
+    - name: http
+      port: {{ .Values.web.port }}
+      targetPort: http
+{{- end }}
