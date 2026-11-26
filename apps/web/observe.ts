@@ -15,8 +15,25 @@ function stop(): Promise<void> {
 	return prior.dispose();
 }
 
-export function activate(endpoint?: string, options?: Settings): Locus {
-	const target = typeof endpoint === "string" ? endpoint.trim() : "";
+function clean(text: string): boolean {
+	if (!text || /\s/u.test(text) || text.includes("\\")) return false;
+	for (const char of text) {
+		const point = char.codePointAt(0) ?? 0;
+		if (point < 32 || (point >= 127 && point <= 159)) return false;
+	}
+	return true;
+}
+
+export function endpoint(raw: unknown): string | undefined {
+	if (typeof raw !== "string") return undefined;
+	const text = raw.trim();
+	if (!text.startsWith("/") || text.startsWith("//")) return undefined;
+	if (!clean(text)) return undefined;
+	return text;
+}
+
+export function activate(raw?: string, options?: Settings): Locus {
+	const target = endpoint(raw);
 	if (!target) {
 		if (active !== undefined) void stop();
 		return locus;

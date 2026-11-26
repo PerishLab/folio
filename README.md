@@ -50,8 +50,8 @@ format marker refuses to start without modifying `estate.sqlite3`. Keep
 The settings routes and response shape continue to use the code Catalog.
 A single process holds the data root. SIGINT/SIGTERM drain requests before
 exit. `/health` performs an actual native resource read.
-Configuration uses Radicula Cascade and Plumb resolution, under the `API_`
-prefix. Relative keys and data paths resolve against the supplied config root.
+Configuration uses Radicula Cascade and Plumb resolution, under the `FOLIO_`
+prefix (with transitional `API_` fallback). Relative keys and data paths resolve against the supplied config root.
 
 ## API
 
