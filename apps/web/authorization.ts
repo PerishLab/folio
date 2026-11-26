@@ -1,26 +1,31 @@
-import { activate, locus, safe, tally } from "./observe.ts";
+import { context, locus, safe, stored, tally } from "./observe.ts";
+import { type Config, configuration, Refusal } from "./src/lib/discovery.ts";
+import { claim, exchange } from "./src/lib/token.ts";
+import { clear, Locker, type Vault } from "./src/lib/vault.ts";
 
-export class Refusal extends Error {}
+export { type Config, configuration, Refusal, type Vault };
 
-export type Config = {
-	issuer: string;
-	client: string;
-	audience: string;
-	authorize: string;
-	token: string;
-	observe?: string;
+type Seat = {
+	origin: string;
+	back: string;
+	storage: Vault;
+	fallback?: Vault;
+	crypto: Crypto;
 };
-
-type Vault = Pick<Storage, "getItem" | "setItem" | "removeItem">;
-type Seat = { origin: string; back: string; storage: Vault; crypto: Crypto };
+type Callback = {
+	url: string;
+	storage: Vault;
+	fallback?: Vault;
+	fetcher: typeof fetch;
+};
 type Journey = Config & {
 	origin: string;
 	back: string;
 	state: string;
 	verifier: string;
 };
+type Prepared = { journey: Journey; url: URL; code: string };
 
-const slot = "folio.authorization";
 const routes = ["/", "/tags", "/templates", "/documents"];
 const listeners = new Set<() => void>();
 let access: { value: string; until: number } | undefined;
@@ -44,12 +49,8 @@ export function held(): string | undefined {
 export function forget(): void {
 	const had = access !== undefined;
 	access = undefined;
-	globalThis.sessionStorage?.removeItem(slot);
+	clear();
 	if (had) notify();
-}
-
-function trim(value: string): string {
-	return value.replace(/\/+$/, "");
 }
 
 function encode(bytes: Uint8Array): string {
@@ -69,50 +70,13 @@ function single(query: URLSearchParams, key: string): string | undefined {
 	return values[0] || undefined;
 }
 
-function text(value: unknown): string | undefined {
-	return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-export async function configuration(
-	fetcher: typeof fetch = fetch,
-): Promise<Config | undefined> {
-	const response = await fetcher("/client.json", {
-		cache: "no-store",
-		credentials: "omit",
-		redirect: "error",
-		signal: AbortSignal.timeout(15000),
-	});
-	if (!response.ok) throw new Refusal("暂时无法读取客户端配置，请重试。");
-	const raw = await response.json();
-	if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-		throw new Refusal("暂时无法确认身份配置，请重试。");
+function inspect(href: string): { query?: URLSearchParams; state?: string } {
+	try {
+		const query = new URL(href).searchParams;
+		return { query, state: single(query, "state") };
+	} catch {
+		return {};
 	}
-	const observe = text(raw.observe);
-	if (observe) activate(observe);
-	if (!raw.issuer && !raw.client) return undefined;
-	const issuer = text(raw.issuer);
-	const client = text(raw.client);
-	if (!issuer || !client) throw new Refusal("暂时无法确认身份配置，请重试。");
-	const endpoint = text(raw.endpoint);
-	const audience = text(raw.audience) ?? "folio";
-	const base = trim(endpoint ?? issuer);
-	const discovery = await fetcher(`${base}/.well-known/openid-configuration`, {
-		cache: "no-store",
-		credentials: "omit",
-		redirect: "error",
-		signal: AbortSignal.timeout(15000),
-	});
-	if (!discovery.ok) throw new Refusal("暂时无法确认身份服务，请重试。");
-	const known = await discovery.json();
-	const authorize = text(known.authorization_endpoint);
-	const token = text(known.token_endpoint);
-	if (known.issuer !== issuer || !authorize || !token) {
-		throw new Refusal("无法确认身份服务的有效签发方。");
-	}
-	const resolved = endpoint ? `${base}/token` : token;
-	return observe
-		? { issuer, client, audience, authorize, token: resolved, observe }
-		: { issuer, client, audience, authorize, token: resolved };
 }
 
 export function start(config: Config, seat: Seat): Promise<string> {
@@ -131,7 +95,11 @@ export function start(config: Config, seat: Seat): Promise<string> {
 			state,
 			verifier,
 		};
-		seat.storage.setItem(slot, JSON.stringify(journey));
+		const saved = new Locker(seat.storage, seat.fallback).save(
+			state,
+			JSON.stringify(journey),
+		);
+		stored(saved.verified, saved.keys, saved.backed);
 		const target = new URL(config.authorize, seat.origin);
 		if (target.protocol !== "https:" && target.protocol !== "http:") {
 			throw new Refusal("身份服务授权地址无效。");
@@ -203,96 +171,61 @@ function verify(query: URLSearchParams, state: string): string {
 	return code;
 }
 
-async function reason(response: Response): Promise<string | undefined> {
-	try {
-		const body = await response.json();
-		return safe(body?.error);
-	} catch {
-		return undefined;
-	}
-}
-
-async function exchange(
-	endpoint: string,
-	fetcher: typeof fetch,
-	form: URLSearchParams,
-): Promise<Response> {
-	let response: Response;
-	try {
-		response = await fetcher(endpoint, {
-			method: "POST",
-			cache: "no-store",
-			credentials: "omit",
-			redirect: "error",
-			signal: AbortSignal.timeout(15000),
-			headers: { "content-type": "application/x-www-form-urlencoded" },
-			body: form,
-		});
-	} catch {
-		locus.fault(new Error("token exchange failed"), { stage: "exchange" });
-		tally("token.failed", { status: "network" });
-		throw new Refusal("登录凭证交换失败，请重新登录。");
-	}
-	if (!response.ok) {
-		const code = await reason(response);
-		const detail: Record<string, string | number | boolean> = {
-			status: response.status,
-		};
-		if (code) detail.reason = code;
-		locus.fault(new Error("token exchange failed"), detail);
-		tally("token.failed", { status: String(response.status) });
-		throw new Refusal("登录凭证交换失败，请重新登录。");
-	}
-	return response;
-}
-
-function claim(result: Record<string, unknown>): {
-	value: string;
-	until: number;
-} {
-	const token = text(result.access_token);
-	const seconds = result.expires_in;
-	const oktype = result.token_type === "Bearer" && Boolean(token);
-	const oktime =
-		typeof seconds === "number" && Number.isFinite(seconds) && seconds > 0;
-	if (!oktype || !oktime || !token) {
-		locus.warn("callback claim invalid");
-		tally("claim.invalid");
-		throw new Refusal("暂时无法完成身份确认。");
-	}
-	return { value: token, until: Date.now() + seconds * 1000 };
-}
-
-export function complete(
+function prepare(
 	config: Config,
-	seat: { url: string; storage: Vault; fetcher: typeof fetch },
-): Promise<string> {
+	locker: Locker,
+	source: string | undefined,
+	href: string,
+): Prepared {
+	if (!source) {
+		locus.warn("callback storage missing");
+		tally("storage.missing");
+		throw new Refusal("登录上下文已失效（本地会话缺失），请重新登录。");
+	}
+	const journey = parse(source);
+	locker.take(journey.state);
+	const url = new URL(href);
+	match(journey, config, url);
+	const code = verify(url.searchParams, journey.state);
+	return { journey, url, code };
+}
+
+export function complete(config: Config, seat: Callback): Promise<string> {
 	return locus.trace("auth.complete", async () => {
-		const raw = seat.storage.getItem(slot);
-		seat.storage.removeItem(slot);
+		const locker = new Locker(seat.storage, seat.fallback);
+		const keys = locker.count();
+		const raw = locker.pull();
 		access = undefined;
 		notify();
-		if (!raw) {
-			locus.warn("callback storage missing");
-			tally("storage.missing");
-			throw new Refusal("登录上下文已失效（本地会话缺失），请重新登录。");
-		}
-		const journey = parse(raw);
-		const url = new URL(seat.url);
-		match(journey, config, url);
-		const code = verify(url.searchParams, journey.state);
+		const parsed = inspect(seat.url);
+		const backup = raw ? undefined : locker.take(parsed.state);
+		const recovered = !raw && Boolean(backup);
+		const diag = context(parsed.query, Boolean(raw), recovered, keys);
+		const ready = locus.with(diag, () => {
+			if (recovered) {
+				locus.warn(
+					"callback session storage missing; recovered via local fallback",
+				);
+			}
+			return prepare(config, locker, raw ?? backup, seat.url);
+		});
 		const form = new URLSearchParams({
 			grant_type: "authorization_code",
 			client_id: config.client,
-			redirect_uri: `${url.origin}/callback`,
-			code,
-			code_verifier: journey.verifier,
+			redirect_uri: `${ready.url.origin}/callback`,
+			code: ready.code,
+			code_verifier: ready.journey.verifier,
 		});
-		const response = await exchange(config.token, seat.fetcher, form);
-		access = claim(await response.json());
-		notify();
-		locus.info("callback completed");
-		tally("ok");
-		return journey.back;
+		const response = await exchange(config.token, seat.fetcher, form, diag);
+		const body = await response.json();
+		return locus.with(diag, () => {
+			access = claim(body);
+			notify();
+			locus.info(
+				recovered ? "callback completed via fallback" : "callback completed",
+			);
+			tally(recovered ? "ok.fallback" : "ok");
+			return ready.journey.back;
+		});
 	})();
 }

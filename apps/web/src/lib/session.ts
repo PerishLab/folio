@@ -21,6 +21,7 @@ import {
 	type Store,
 	type Tone,
 } from "../../workbench.ts";
+import { local } from "./vault.ts";
 
 export type State = {
 	ready: boolean;
@@ -185,6 +186,7 @@ export async function enter(back: string): Promise<void> {
 			origin: location.origin,
 			back,
 			storage: sessionStorage,
+			fallback: local(),
 			crypto,
 		});
 		location.assign(target);

@@ -117,6 +117,26 @@ async fn disabled() {
 #[tokio::test]
 async fn config() {
     let root = tempfile::tempdir().unwrap();
+    std::fs::write(
+        root.path().join("folio.toml"),
+        format!(
+            "issuer = {:?}\naudience = {:?}\n[locus]\nendpoint = \"https://api.locus.example\"\n",
+            support::ISSUER,
+            support::AUDIENCE
+        ),
+    )
+    .unwrap();
+    let missing = Settings::from(root.path(), &|_| None).unwrap();
+    assert!(missing.relay(root.path()).is_err());
+    let envonly = Settings::from(root.path(), &|name| match name {
+        "API_LOCUS_KEY" => Some("env-secret-value".into()),
+        _ => None,
+    })
+    .unwrap();
+    assert_eq!(envonly.locus.key, "env-secret-value");
+    let debug = format!("{:?}", envonly.locus);
+    assert!(debug.contains("[redacted]") && !debug.contains("env-secret-value"));
+    assert!(envonly.relay(root.path()).unwrap().is_some());
     std::fs::write(root.path().join("writer.key"), format!("{SECRET}\n")).unwrap();
     std::fs::write(
         root.path().join("folio.toml"),
@@ -127,14 +147,6 @@ async fn config() {
         ),
     )
     .unwrap();
-    let settings = Settings::from(root.path(), &|name| match name {
-        "FOLIO_LOCUS_KEY" => Some("env-secret-value".into()),
-        _ => None,
-    })
-    .unwrap();
-    let debug = format!("{:?}", settings.locus);
-    assert!(debug.contains("[redacted]") && !debug.contains("env-secret-value"));
-    assert!(settings.relay(root.path()).unwrap().is_some());
     let fromfile = Settings::from(root.path(), &|_| None).unwrap();
     assert!(fromfile.relay(root.path()).unwrap().is_some());
 }

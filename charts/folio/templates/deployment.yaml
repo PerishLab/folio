@@ -47,11 +47,11 @@ spec:
           args: [serve, /config]
           {{- if and .Values.locus.enabled .Values.locus.keySecret.name }}
           env:
-            - name: FOLIO_LOCUS_KEY
+            - name: API_LOCUS_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.locus.keySecret.name | quote }}
-                  key: {{ .Values.locus.keySecret.key | quote }}
+                  key: {{ .Values.locus.keySecret.key | default "value" | quote }}
           {{- end }}
           securityContext:
             allowPrivilegeEscalation: false

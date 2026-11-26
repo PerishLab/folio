@@ -3,6 +3,7 @@ import { Frame, Hero, Link, Note, Sheet, Shell } from "@perishlab/design";
 import { onMount } from "svelte";
 import { complete, configuration, Refusal } from "../../authorization.ts";
 import { device } from "../lib/session.ts";
+import { local } from "../lib/vault.ts";
 
 let warning = $state("");
 let tone = $state(device());
@@ -17,6 +18,7 @@ onMount(() => {
 			const back = await complete(config, {
 				url,
 				storage: sessionStorage,
+				fallback: local(),
 				fetcher: fetch,
 			});
 			history.replaceState(null, "", back);
