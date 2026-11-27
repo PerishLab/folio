@@ -99,15 +99,12 @@ pub(crate) fn model() -> Result<Model, Error> {
 
 pub(crate) async fn seed(core: &keel::Core<keel::adapt::db::Sqlite>) -> Result<(), Error> {
     for grant in GRANTS {
-        core.put(
-            "@grant",
-            &[
-                ("who", grant.who),
-                ("verb", grant.verb),
-                ("unit", grant.unit),
-                ("scope", grant.scope),
-            ],
-        )
+        core.grant(keel::Grant::new(
+            grant.who,
+            grant.verb,
+            grant.unit,
+            grant.scope,
+        ))
         .await?;
     }
     Ok(())

@@ -170,16 +170,13 @@ async fn revoke() {
         }
         let who = row.text("who").unwrap().to_string();
         let scope = row.text("scope").unwrap().to_string();
-        core.end("@grant", row.key()).await.unwrap();
-        core.put(
-            "@grant",
-            &[
-                ("who", who.as_str()),
-                ("verb", "see"),
-                ("unit", "documentstore:document"),
-                ("scope", scope.as_str()),
-            ],
-        )
+        core.revoke(row.key()).await.unwrap();
+        core.grant(keel::Grant::new(
+            who.as_str(),
+            "see",
+            "documentstore:document",
+            scope.as_str(),
+        ))
         .await
         .unwrap();
     }

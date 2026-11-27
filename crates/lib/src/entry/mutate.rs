@@ -211,7 +211,7 @@ impl Runtime {
         );
         let rows = self.core.ask(&query).await?;
         for row in rows.rows() {
-            self.core.end("@grant", row.key()).await?;
+            self.core.revoke(row.key()).await?;
         }
         Ok(())
     }

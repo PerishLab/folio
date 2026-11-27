@@ -98,7 +98,7 @@ async fn revoke() {
             row.text("unit") == Some("documentstore:document") && row.text("verb") == Some("*")
         })
         .unwrap();
-    core.end("@grant", grant.key()).await.unwrap();
+    core.revoke(grant.key()).await.unwrap();
     let body = json!({"revision":initial["revision"],"changes":[set(shared(),"theme.tone",json!("dark"))]});
     let (status, _) = call(
         &router,
