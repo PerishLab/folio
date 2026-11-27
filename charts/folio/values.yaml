@@ -1,3 +1,4 @@
+imagePullSecrets: []
 issuer: ""
 audience: folio
 apps: []
