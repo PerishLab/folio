@@ -82,11 +82,10 @@ impl Settings {
     }
 
     pub fn from(root: &Path, get: &dyn Fn(&str) -> Option<String>) -> Result<Self, String> {
-        let env = plumb::config::migrated(&Self::prefix(), "API", get);
         let path = root.join("folio.toml");
         let mut settings =
-            Self::resolve(Some(&path), &Self::prefix(), &env).map_err(|error| error.to_string())?;
-        if let Some(raw) = env(&format!("{}_APPS", Self::prefix())) {
+            Self::resolve(Some(&path), &Self::prefix(), get).map_err(|error| error.to_string())?;
+        if let Some(raw) = get(&format!("{}_APPS", Self::prefix())) {
             let trimmed = raw.trim();
             if !trimmed.is_empty() {
                 settings.apps = trimmed
@@ -95,7 +94,7 @@ impl Settings {
                     .collect();
             }
         }
-        if let Some(raw) = env("SIDECAR_PORT") {
+        if let Some(raw) = get("SIDECAR_PORT") {
             let trimmed = raw.trim();
             if !trimmed.is_empty() {
                 let port: u16 = trimmed

@@ -211,28 +211,19 @@ fn config() {
     );
     let legacy = api::config::Settings::from(dir.path(), &|key| match key {
         "API_APPS" => Some("alpha, beta".into()),
+        "API_AUDIENCE" => Some("ignored".into()),
         _ => None,
     })
     .unwrap();
-    assert_eq!(legacy.apps, vec!["alpha", "beta"]);
-    assert_eq!(
-        legacy.catalog().unwrap().apps(),
-        &["ensign", "folio", "alpha", "beta"]
-    );
-    let both = api::config::Settings::from(dir.path(), &|key| match key {
-        "FOLIO_APPS" => Some("gamma".into()),
-        "API_APPS" => Some("alpha".into()),
-        _ => None,
-    })
-    .unwrap();
-    assert_eq!(both.apps, vec!["gamma"]);
+    assert_eq!(legacy.apps, vec!["santi", "concord"]);
+    assert_eq!(legacy.audience, "folio");
     let blank = api::config::Settings::from(dir.path(), &|key| match key {
         "FOLIO_APPS" => Some("   ".into()),
         "API_APPS" => Some("alpha".into()),
         _ => None,
     })
     .unwrap();
-    assert_eq!(blank.apps, vec!["alpha"]);
+    assert_eq!(blank.apps, vec!["santi", "concord"]);
     let sidecar = api::config::Settings::from(dir.path(), &|key| {
         if key == "SIDECAR_PORT" {
             Some("4312".into())

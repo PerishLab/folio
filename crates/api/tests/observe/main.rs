@@ -137,8 +137,8 @@ async fn config() {
         _ => None,
     })
     .unwrap();
-    assert_eq!(legacy.locus.key, "legacy-secret-value");
-    assert!(legacy.relay(root.path()).unwrap().is_some());
+    assert!(legacy.locus.key.is_empty());
+    assert!(legacy.relay(root.path()).is_err());
     let both = Settings::from(root.path(), &|name| match name {
         "FOLIO_LOCUS_KEY" => Some("folio-wins".into()),
         "API_LOCUS_KEY" => Some("legacy-loses".into()),
