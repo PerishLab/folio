@@ -6,7 +6,7 @@ pub use board::{Board, Workbench};
 use crate::{Catalog, Device, Error, Identity, Snapshot, State, Write, model, schema};
 use keel::adapt::db::Sqlite;
 use keel::{Core, Op, bind, bootstrap, form};
-use keel_document::{Condition, Projection, Query, Record, Store};
+use keel_document::{Condition, Limit, Projection, Query, Record, Store};
 use radicula_document::{Document, Operation, Path};
 use serde_json::json;
 use std::path::Path as Directory;
@@ -101,6 +101,7 @@ impl Runtime {
 
     pub(crate) async fn record(&self, actor: i64) -> Result<Record, Error> {
         let query = Query {
+            collection: "users".into(),
             conditions: vec![Condition::Equal {
                 path: Path::parse("/owner")?,
                 value: actor.to_string().into(),
@@ -109,8 +110,9 @@ impl Runtime {
                 name: "body".into(),
                 path: Path::root(),
             }],
+            limit: Limit::default(),
         };
-        let mut rows = self.store.of(actor).query("users", &query).await?;
+        let (mut rows, _) = self.store.of(actor).query(&query).await?;
         if rows.len() > 1 {
             return Err(Error::Corrupt);
         }
@@ -133,7 +135,7 @@ impl Runtime {
         match created {
             Ok(record) => Ok(record),
             Err(error) => {
-                let mut rows = self.store.of(actor).query("users", &query).await?;
+                let (mut rows, _) = self.store.of(actor).query(&query).await?;
                 if rows.len() != 1 {
                     return Err(error.into());
                 }

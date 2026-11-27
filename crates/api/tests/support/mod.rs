@@ -154,16 +154,8 @@ pub async fn grant(root: &std::path::Path, subject: &str) {
         ("documentstore:document", "pred collection = \"schemas\""),
     ];
     for (unit, scope) in scopes {
-        core.put(
-            "@grant",
-            &[
-                ("who", actor.as_str()),
-                ("verb", "put"),
-                ("unit", unit),
-                ("scope", scope),
-            ],
-        )
-        .await
-        .unwrap();
+        core.grant(keel::Grant::new(actor.as_str(), "put", unit, scope))
+            .await
+            .unwrap();
     }
 }

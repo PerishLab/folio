@@ -224,7 +224,7 @@ async fn denied() {
     let core = estate(root.path()).await;
     for row in core.live("@grant").await.unwrap() {
         if row.text("unit") == Some("Entry") && row.text("verb") == Some("put") {
-            core.end("@grant", row.key()).await.unwrap();
+            core.revoke(row.key()).await.unwrap();
         }
     }
     let docs = core.live("documentstore:document").await.unwrap().len();

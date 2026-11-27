@@ -107,15 +107,12 @@ impl Runtime {
         let scope = format!("row {}", record.head.id);
         let grant = self
             .core
-            .put(
-                "@grant",
-                &[
-                    ("who", who.as_str()),
-                    ("verb", "*"),
-                    ("unit", DOCUMENT),
-                    ("scope", scope.as_str()),
-                ],
-            )
+            .grant(keel::Grant::new(
+                who.as_str(),
+                "*",
+                DOCUMENT,
+                scope.as_str(),
+            ))
             .await;
         let grant = match grant {
             Ok(id) => id,
@@ -142,7 +139,7 @@ impl Runtime {
             )
             .await;
         if let Err(error) = created {
-            self.core.end("@grant", grant).await?;
+            self.core.revoke(grant).await?;
             self.store.sudo().end(&record.head).await?;
             return Err(Error::from(error).clash());
         }
